@@ -13,7 +13,7 @@ struct Args {
    #[arg(short, long)]
    marked_period: u32,
 
-   /// Whether to use per2
+   /// Period of the critical cycle (must be 1 or 2 for now)
    #[arg(short, long, default_value_t = 1)]
    crit_period: u32,
 }
@@ -30,8 +30,8 @@ fn main() {
     };
 
     println!(
-        "Computing combinatorics of (c,lambda) -> c cover for period {}",
-        period
+        "Computing combinatorics of (c,lambda) -> c cover for marked period {}, critical period {}",
+        period, (args.crit_period == 2) as i32 + 1
     );
 
     let mut cov = MarkedMultCover::new(period, 2, use_per2);
