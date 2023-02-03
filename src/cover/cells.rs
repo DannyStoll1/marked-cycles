@@ -1,11 +1,13 @@
+use crate::types::Period;
+
 #[derive(Debug, PartialEq)]
 pub struct Face {
-    pub vertices: Vec<u32>,
-    pub degree: u32,
+    pub vertices: Vec<Period>,
+    pub degree: Period,
 }
 
 impl Face {
-    pub fn edges(&self) -> Vec<(u32, u32)> {
+    pub fn edges(&self) -> Vec<(Period, Period)> {
         let mut edges = Vec::new();
         for i in 0..self.vertices.len() {
             edges.push((
@@ -23,20 +25,20 @@ impl Face {
 
 #[derive(Debug, PartialEq)]
 pub struct Edge {
-    pub angles: (u32, u32),
-    pub endpoints: (u32, u32),
-    pub period: u32,
-    pub degree: u32,
+    pub angles: (Period, Period),
+    pub endpoints: (Period, Period),
+    pub period: Period,
+    pub degree: Period,
 }
 
 impl Edge {
     pub fn is_real(&self) -> bool {
-        self.angles.0 + self.angles.1 == self.degree.pow(self.period as u32) - 1
+        self.angles.0 + self.angles.1 == self.degree.pow(self.period .try_into().unwrap()) - 1
     }
 
     pub fn to_string(&self) -> String {
         let n = self.period as usize;
-        let m = (self.degree.pow(self.period as u32)).to_string().len();
+        let m = (self.degree.pow(self.period .try_into().unwrap())).to_string().len();
         let t = self.angles.0;
         let a = self.endpoints.0;
         let b = self.endpoints.1;

@@ -1,48 +1,49 @@
 use num_bigint::BigInt;
-use num_rational::Rational32;
+use num_rational::Rational64;
 use std::collections::HashSet;
+use crate::types::Period;
 
 pub struct Lamination {
-    per2: bool,
-    degree: u32,
-    max_period: u32,
-    size: u32,
-    arcs: Vec<(u32, Rational32, Rational32)>,
-    endpoints: HashSet<Rational32>,
-    period_cutoffs: Vec<u32>,
+    crit_period: Period,
+    degree: Period,
+    max_period: Period,
+    size: Period,
+    arcs: Vec<(Period, Rational64, Rational64)>,
+    endpoints: HashSet<Rational64>,
+    period_cutoffs: Vec<Period>,
 }
 
 impl Lamination {
-    pub fn new(period: u32, degree: u32, per2: bool) -> Self {
+    pub fn new(period: Period, degree: Period, crit_period: Period) -> Self {
         let mut lamination = Lamination {
-            per2,
+            crit_period,
             degree,
             max_period: 1,
             size: 1,
-            arcs: vec![(0, Rational32::new(0, 1), Rational32::new(0, 1))],
+            arcs: vec![(0, Rational64::new(0, 1), Rational64::new(0, 1))],
             endpoints: HashSet::new(),
             period_cutoffs: vec![0, 1],
         };
-        lamination.endpoints.insert(Rational32::new(0, 1));
+        lamination.endpoints.insert(Rational64::new(0, 1));
         lamination.extend_to_period(period);
         lamination
     }
 
     fn extend(&mut self) {
         self.max_period += 1;
-        let n = self.degree.pow(self.max_period as u32) - 1;
+        let n = self.degree.pow(self.max_period.try_into().unwrap()) - 1;
         let mut counters: Vec<BigInt> = vec![BigInt::from(0); n as usize];
         let neg_one = BigInt::from(-1);
 
         for k in 0..n {
             if self
                 .endpoints
-                .contains(&Rational32::new(k as i32, n as i32))
+                .contains(&Rational64::new(k as Period, n as Period))
             {
                 counters[k as usize] = neg_one.clone();
             }
         }
-        if self.per2 {
+        if self.crit_period == 2 {
             let lo = n / 3 + 1;
             let hi = if n % 3 == 0 { 2 * n / 3 } else { 2 * n / 3 + 1 };
             for k in lo..hi {
@@ -51,7 +52,7 @@ impl Lamination {
         }
 
         for &(id, a, b) in self.arcs.iter() {
-            let n_rat = Rational32::from(n as i32);
+            let n_rat = Rational64::from(n as Period);
             let lo = (n_rat * a).ceil().to_integer();
             let hi = (n_rat * b).ceil().to_integer();
             let counter_modification = BigInt::from(1) << id;
@@ -72,30 +73,30 @@ impl Lamination {
             if let Some(&angle) = angles.get(&counter) {
                 let id = self.size;
                 self.arcs
-                    .push((id, angle, Rational32::new(k as i32, n as i32)));
+                    .push((id, angle, Rational64::new(k as Period, n as Period)));
                 self.size += 1;
                 self.endpoints.insert(angle);
-                self.endpoints.insert(Rational32::new(k as i32, n as i32));
+                self.endpoints.insert(Rational64::new(k as Period, n as Period));
                 angles.remove(&counter);
             } else {
-                angles.insert(counter, Rational32::new(k as i32, n as i32));
+                angles.insert(counter, Rational64::new(k as Period, n as Period));
             }
         }
 
         self.period_cutoffs.push(self.size);
     }
 
-    fn len(&self) -> u32 {
+    fn len(&self) -> Period {
         self.size
     }
 
-    fn extend_to_period(&mut self, period: u32) {
-        for _ in self.max_period..(period as u32) {
+    fn extend_to_period(&mut self, period: Period) {
+        for _ in self.max_period..(period as Period) {
             self.extend();
         }
     }
 
-    pub fn arcs_of_period(&self, per: u32, sort: bool) -> Vec<(Rational32, Rational32)> {
+    pub fn arcs_of_period(&self, per: Period, sort: bool) -> Vec<(Rational64, Rational64)> {
         let i = self.period_cutoffs[per as usize - 1] as usize;
         let j = self.period_cutoffs[per as usize] as usize;
         let mut out = self.arcs[i..j]
@@ -108,7 +109,7 @@ impl Lamination {
         out
     }
 
-    fn arc_lengths_of_period(&self, per: u32) -> Vec<Rational32> {
+    fn arc_lengths_of_period(&self, per: Period) -> Vec<Rational64> {
         let i = self.period_cutoffs[per as usize - 1] as usize;
         let j = self.period_cutoffs[per as usize] as usize;
         self.arcs[i..j]
@@ -117,7 +118,7 @@ impl Lamination {
             .collect::<Vec<_>>()
     }
 
-    fn arc_lengths_cumulative(&self, max_per: i32) -> Vec<Rational32> {
+    fn arc_lengths_cumulative(&self, max_per: Period) -> Vec<Rational64> {
         let j = if max_per == -1 {
             self.arcs.len()
         } else {
@@ -129,7 +130,7 @@ impl Lamination {
             .collect::<Vec<_>>()
     }
 
-    fn arc_lengths_cumulative_set(&self, max_per: i32) -> HashSet<Rational32> {
+    fn arc_lengths_cumulative_set(&self, max_per: Period) -> HashSet<Rational64> {
         let j = if max_per == -1 {
             self.arcs.len()
         } else {
@@ -143,7 +144,7 @@ impl Lamination {
 }
 
 fn main() {
-    let lamination = Lamination::new(10, 2, false);
+    let lamination = Lamination::new(10, 2, 1);
     let arcs = lamination.arcs_of_period(9, true);
     for (a, b) in arcs {
         println!(

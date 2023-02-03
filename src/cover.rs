@@ -5,39 +5,40 @@ mod cells;
 use cells::{Face, Edge};
 
 use crate::lamination::Lamination;
+use crate::types::Period;
 
 #[derive(Debug, PartialEq)]
 pub struct MarkedMultCover {
-    period: u32,
-    degree: u32,
-    per2: bool,
-    max_angle: u32,
-    ray_sets: Vec<(u32, u32)>,
-    cycles: HashMap<u32, u32>,
-    cycle_classes: HashMap<u32, u32>,
-    cycle_pairs: Vec<((u32, u32), Vec<u32>)>,
-    vertices: Vec<u32>,
+    period: Period,
+    degree: Period,
+    crit_period: Period,
+    max_angle: Period,
+    ray_sets: Vec<(Period, Period)>,
+    cycles: HashMap<Period, Period>,
+    cycle_classes: HashMap<Period, Period>,
+    cycle_pairs: Vec<((Period, Period), Vec<Period>)>,
+    vertices: Vec<Period>,
     edges: Vec<Edge>,
-    faces: HashMap<u32, Face>,
-    _visited_cycles: HashSet<u32>,
+    faces: HashMap<Period, Face>,
+    _visited_cycles: HashSet<Period>,
 }
 
 impl MarkedMultCover {
-    pub fn new(period: u32, degree: u32, per2: bool) -> Self {
-        let max_angle = degree.pow(period as u32) - 1;
+    pub fn new(period: Period, degree: Period, crit_period: Period) -> Self {
+        let max_angle = degree.pow(period.try_into().unwrap()) - 1;
 
-        let mut ray_sets = Vec::new();
+        let ray_sets = Vec::new();
 
-        let mut cycles = HashMap::new();
-        let mut cycle_classes = HashMap::new();
-        let mut cycle_pairs = Vec::new();
-        let mut vertices = Vec::new();
-        let mut edges = Vec::new();
+        let cycles = HashMap::new();
+        let cycle_classes = HashMap::new();
+        let cycle_pairs = Vec::new();
+        let vertices = Vec::new();
+        let edges = Vec::new();
 
-        Self {
+        let mut curve = Self {
             period,
             degree,
-            per2,
+            crit_period,
             max_angle,
             ray_sets,
             cycles,
@@ -47,15 +48,17 @@ impl MarkedMultCover {
             edges,
             faces: HashMap::new(),
             _visited_cycles: HashSet::new(),
-        }
+        };
+        curve.run();
+        curve
     }
 
     fn _compute_ray_sets(&mut self) {
-        let lamination = Lamination::new(self.period, self.degree, self.per2);
+        let lamination = Lamination::new(self.period, self.degree, self.crit_period);
         for angles in lamination.arcs_of_period(self.period, true) {
             self.ray_sets.push((
-                (angles.0 * (self.max_angle as i32)).to_integer() as u32,
-                (angles.1 * (self.max_angle as i32)).to_integer() as u32,
+                (angles.0 * self.max_angle).to_integer() as Period,
+                (angles.1 * self.max_angle).to_integer() as Period,
             ));
         }
         self.ray_sets.sort();
@@ -126,23 +129,35 @@ impl MarkedMultCover {
         self._compute_faces();
     }
 
-    fn euler_characteristic(&self) -> isize {
+    pub fn euler_characteristic(&self) -> isize {
         self.vertices.len() as isize - self.edges.len() as isize + self.faces.len() as isize
     }
 
-    fn genus(&self) -> isize {
+    pub fn num_vertices(&self) -> usize {
+        self.vertices.len()
+    }
+
+    pub fn num_edges(&self) -> usize {
+        self.edges.len()
+    }
+
+    pub fn num_faces(&self) -> usize {
+        self.faces.len()
+    }
+
+    pub fn genus(&self) -> isize {
         1 - self.euler_characteristic() / 2
     }
 
-    fn face_sizes(&self) -> Vec<usize> {
+    pub fn face_sizes(&self) -> Vec<usize> {
         self.faces.values().map(|f| f.vertices.len()).collect()
     }
 
-    fn num_odd_faces(&self) -> usize {
+    pub fn num_odd_faces(&self) -> usize {
         self.face_sizes().iter().filter(|&s| s % 2 == 1).count()
     }
 
-    fn orbit(&self, angle: u32) -> HashSet<u32> {
+    pub fn orbit(&self, angle: Period) -> HashSet<Period> {
         get_orbit(angle, self.max_angle, self.period, self.degree)
     }
 
@@ -158,7 +173,7 @@ impl MarkedMultCover {
         }
     }
 
-    fn _traverse_face(&mut self, starting_angle: u32) -> Face {
+    fn _traverse_face(&mut self, starting_angle: Period) -> Face {
         let mut node = starting_angle;
         let mut nodes = Vec::new();
         nodes.push(node);
@@ -198,7 +213,7 @@ impl MarkedMultCover {
 
         println!("\n{} vertices:", self.vertices.len());
         let n = self.period;
-        let m = (self.degree.pow(n as u32)).to_string().len();
+        // let m = (self.degree.pow(n as Period)).to_string().len();
         for v in &self.vertices {
             println!("{}{}", indent_str, v);
         }
@@ -228,7 +243,7 @@ impl MarkedMultCover {
     }
 }
 
-fn get_orbit(angle: u32, max_angle: u32, period: u32, degree: u32) -> HashSet<u32> {
+fn get_orbit(angle: Period, max_angle: Period, period: Period, degree: Period) -> HashSet<Period> {
     let mut orbit = HashSet::new();
     let mut theta = angle.clone();
 
