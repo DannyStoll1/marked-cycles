@@ -33,7 +33,6 @@ fn print_combinatorics(period: Period, crit_period: Period) {
         );
 
         let mut cov = MarkedMultCover::new(period, 2, crit_period);
-        cov.run();
 
         cov.summarize(4);
     }
