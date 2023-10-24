@@ -4,6 +4,8 @@ use num::integer::gcd;
 use num::pow;
 use std::collections::HashMap;
 
+// TODO: add CurveParams struct
+
 fn divisors(n: Period) -> impl Iterator<Item = Period>
 {
     (1..).take_while(move |&x| x * x <= n).flat_map(move |x| {
@@ -25,12 +27,14 @@ fn divisors(n: Period) -> impl Iterator<Item = Period>
     })
 }
 
+#[must_use]
 pub fn euler_totient(n: Period) -> INum
 {
     (1..=n).filter(|&x| gcd(x, n) == 1).count() as INum
 }
 
-pub fn moebius(n: Period) -> INum
+#[must_use]
+pub const fn moebius(n: Period) -> INum
 {
     if n == 1
     {
@@ -80,7 +84,7 @@ fn moebius_inversion<F>(f: F, n: Period) -> INum
 where
     F: Fn(Period) -> INum,
 {
-    dirichlet_convolution(|d| moebius(d), |d| f(d), n)
+    dirichlet_convolution(moebius, f, n)
 }
 
 pub struct MarkedCycleCombinatorics
@@ -91,6 +95,7 @@ pub struct MarkedCycleCombinatorics
 
 impl MarkedCycleCombinatorics
 {
+    #[must_use]
     pub fn new(crit_period: Period) -> Self
     {
         let curves = HashMap::new();
@@ -104,9 +109,9 @@ impl MarkedCycleCombinatorics
     pub fn curve(&mut self, n: Period) -> &mut MarkedCycleCover
     {
         let crit_per = self.crit_period;
-        self.curves.entry(n).or_insert_with(|| {
-            MarkedCycleCover::new(n.try_into().unwrap(), 2, crit_per.try_into().unwrap())
-        })
+        self.curves
+            .entry(n)
+            .or_insert_with(|| MarkedCycleCover::new(n, 2, crit_per))
     }
 
     // pub fn _compute_curve(&self, n: Period) -> MarkedMultCover {
@@ -142,11 +147,12 @@ impl MarkedCycleCombinatorics
         curve.genus()
     }
 
+    #[must_use]
     pub fn points_of_period_dividing_n(&self, n: Period) -> INum
     {
         // Number of points of period dividing n
         // under z -> z^(+/- 2)
-        let v = n.try_into().unwrap();
+        let v = n.try_into().unwrap_or(0);
         match self.crit_period
         {
             1 => pow(2, v) - 1,
@@ -155,22 +161,25 @@ impl MarkedCycleCombinatorics
         }
     }
 
+    #[must_use]
     pub fn periodic_points(&self, n: Period) -> INum
     {
         // Number of n-periodic points for z -> z^(+/- 2)
         moebius_inversion(|d| self.points_of_period_dividing_n(d), n)
     }
 
+    #[must_use]
     pub fn cycles(&self, n: Period) -> INum
     {
         // Number of n-cycles of z -> z^(+/- 2)
         self.periodic_points(n) / (n as INum)
     }
 
+    #[must_use]
     pub fn hyp_components_dividing_n(&self, n: Period) -> INum
     {
         // Number of mateable hyperbolic components of period dividing n
-        let v = n.try_into().unwrap();
+        let v = n.try_into().unwrap_or(0);
         match self.crit_period
         {
             1 => pow(2, v) / 2,
@@ -179,6 +188,7 @@ impl MarkedCycleCombinatorics
         }
     }
 
+    #[must_use]
     pub fn hyperbolic_components(&self, n: Period) -> INum
     {
         // Number of mateable hyperbolic components of period n
@@ -188,7 +198,7 @@ impl MarkedCycleCombinatorics
     pub fn satellite_components(&self, n: Period) -> INum
     {
         // Number of mateable satellite hyperbolic components of period n
-        dirichlet_convolution(|d| euler_totient(d), |d| self.hyperbolic_components(d), n)
+        dirichlet_convolution(euler_totient, |d| self.hyperbolic_components(d), n)
             - self.hyperbolic_components(n)
     }
 
@@ -196,7 +206,7 @@ impl MarkedCycleCombinatorics
     {
         // Number of mateable primitive hyperbolic components of period n
         2 * self.hyperbolic_components(n)
-            - dirichlet_convolution(|d| euler_totient(d), |d| self.hyperbolic_components(d), n)
+            - dirichlet_convolution(euler_totient, |d| self.hyperbolic_components(d), n)
     }
 
     pub fn self_conjugate_faces(&self, n: Period) -> INum
@@ -216,7 +226,7 @@ impl MarkedCycleCombinatorics
             * filtered_dirichlet_convolution(
                 moebius,
                 |d| {
-                    let v = d.try_into().unwrap();
+                    let v = d.try_into().unwrap_or(0);
                     pow(2, v) - pow(u, v)
                 },
                 k,
@@ -225,16 +235,19 @@ impl MarkedCycleCombinatorics
             / n
     }
 
+    #[must_use]
     pub fn vertices(&self, n: Period) -> INum
     {
         self.cycles(n)
     }
 
+    #[must_use]
     pub fn edges(&self, n: Period) -> INum
     {
         self.primitive_components(n)
     }
 
+    #[must_use]
     pub fn faces(&self, n: Period) -> INum
     {
         let cper = self.crit_period;
@@ -243,6 +256,7 @@ impl MarkedCycleCombinatorics
         (cyc + cper * selfconj) / (cper + 1)
     }
 
+    #[must_use]
     pub fn genus(&self, n: Period) -> INum
     {
         let prim = self.primitive_components(n);

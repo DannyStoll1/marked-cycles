@@ -1,13 +1,10 @@
-use crate::abstract_cycles::{
-    AbstractCycle, AbstractCycleClass, AbstractPoint, AbstractPointClass, ShiftedCycle,
-};
+use crate::abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint};
 use crate::lamination::Lamination;
 use crate::types::{Angle, Period};
 use std::collections::HashSet;
 
 mod cells;
 use cells::{Edge, Face, Wake};
-use num::Integer;
 
 fn get_orbit(angle: Angle, max_angle: Angle, period: Period, degree: Period) -> Vec<Angle>
 {
@@ -44,7 +41,7 @@ pub struct MarkedCycleCover
 
 impl MarkedCycleCover
 {
-    pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
+    #[must_use] pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
     {
         let max_angle = Angle(degree.pow(period.try_into().unwrap()) - 1);
 
@@ -73,14 +70,16 @@ impl MarkedCycleCover
 
     fn compute_ray_sets(&mut self)
     {
-        let lamination = Lamination::new(self.period, self.degree, self.crit_period);
-        for angles in lamination.arcs_of_period(self.period, true)
-        {
-            self.ray_sets.push((
-                (angles.0 * (self.max_angle.0 as i64)).to_integer().into(),
-                (angles.1 * (self.max_angle.0 as i64)).to_integer().into(),
-            ));
-        }
+        Lamination::new()
+            .with_crit_period(self.crit_period)
+            .arcs_of_period(self.period)
+            .iter()
+            .for_each(|angles| {
+                self.ray_sets.push((
+                    (angles.0 * self.max_angle.0).to_integer().into(),
+                    (angles.1 * self.max_angle.0).to_integer().into(),
+                ));
+            });
         self.ray_sets.sort();
     }
 
@@ -130,8 +129,8 @@ impl MarkedCycleCover
                 let cycle0 = self.cycles[usize::try_from(*theta0).unwrap()].unwrap();
                 let cycle1 = self.cycles[usize::try_from(*theta1).unwrap()].unwrap();
                 Wake {
-                    theta0: cycle0.into(),
-                    theta1: cycle1.into(),
+                    theta0: cycle0,
+                    theta1: cycle1,
                 }
             })
             .collect();
@@ -156,42 +155,42 @@ impl MarkedCycleCover
         self.compute_faces();
     }
 
-    pub fn euler_characteristic(&self) -> isize
+    #[must_use] pub fn euler_characteristic(&self) -> isize
     {
         self.num_vertices() as isize - self.num_edges() as isize + self.num_faces() as isize
     }
 
-    pub fn num_vertices(&self) -> usize
+    #[must_use] pub fn num_vertices(&self) -> usize
     {
         self.vertices.len()
     }
 
-    pub fn num_edges(&self) -> usize
+    #[must_use] pub fn num_edges(&self) -> usize
     {
         self.edges.len()
     }
 
-    pub fn num_faces(&self) -> usize
+    #[must_use] pub fn num_faces(&self) -> usize
     {
         self.faces.len()
     }
 
-    pub fn genus(&self) -> isize
+    #[must_use] pub fn genus(&self) -> isize
     {
         1 - self.euler_characteristic() / 2
     }
 
-    pub fn face_sizes(&self) -> Vec<usize>
+    pub fn face_sizes(&self) -> impl Iterator<Item = usize> + '_
     {
-        self.faces.iter().map(|f| f.vertices.len()).collect()
+        self.faces.iter().map(Face::len)
     }
 
-    pub fn num_odd_faces(&self) -> usize
+    #[must_use] pub fn num_odd_faces(&self) -> usize
     {
-        self.face_sizes().iter().filter(|&s| s % 2 == 1).count()
+        self.face_sizes().filter(|&s| s % 2 == 1).count()
     }
 
-    pub fn orbit(&self, angle: Angle) -> Vec<Angle>
+    #[must_use] pub fn orbit(&self, angle: Angle) -> Vec<Angle>
     {
         get_orbit(angle, self.max_angle, self.period, self.degree)
     }
@@ -210,11 +209,11 @@ impl MarkedCycleCover
             .vertices
             .clone()
             .iter()
-            .filter_map(|cyc| self._traverse_face(*cyc))
+            .filter_map(|cyc| self.traverse_face(*cyc))
             .collect();
     }
 
-    fn _traverse_face(&mut self, starting_point: AbstractCycle) -> Option<Face>
+    fn traverse_face(&mut self, starting_point: AbstractCycle) -> Option<Face>
     {
         let face_id = self.get_cycle_class(starting_point);
         if self.visited_face_ids.contains(&face_id)
@@ -230,17 +229,16 @@ impl MarkedCycleCover
 
         loop
         {
-            for edge in &self.wakes
+            for Wake { theta0, theta1 } in &self.wakes
             {
-                let (a, b) = (edge.theta0, edge.theta1);
-                if node == a
+                if node == *theta0
                 {
-                    node = b;
+                    node = *theta1;
                     nodes.push(node);
                 }
-                else if node == b
+                else if node == *theta1
                 {
-                    node = a;
+                    node = *theta0;
                     nodes.push(node);
                 }
             }
@@ -258,10 +256,7 @@ impl MarkedCycleCover
                     degree: face_degree,
                 });
             }
-            else
-            {
-                self.visited_face_ids.insert(self.get_cycle_class(node));
-            }
+            self.visited_face_ids.insert(self.get_cycle_class(node));
 
             face_degree += 1;
         }
@@ -271,9 +266,9 @@ impl MarkedCycleCover
     {
         let indent_str = " ".repeat(indent);
 
+        println!("\n{} vertices:", self.vertices.len());
         if binary
         {
-            println!("\n{} vertices:", self.vertices.len());
             for v in &self.vertices
             {
                 println!("{}{:b}", indent_str, v);
@@ -293,7 +288,6 @@ impl MarkedCycleCover
         }
         else
         {
-            println!("\n{} vertices:", self.vertices.len());
             for v in &self.vertices
             {
                 println!("{}{}", indent_str, v);
@@ -313,16 +307,38 @@ impl MarkedCycleCover
         }
 
         println!("\nFace sizes:");
-        println!("{}{:?}", indent_str, self.face_sizes());
+        println!("{}{:?}", indent_str, self.face_sizes().collect::<Vec<_>>());
 
-        println!(
-            "\nSmallest face: {}",
-            self.face_sizes().iter().min().unwrap()
-        );
-        println!(
-            "\nLargest face: {}",
-            self.face_sizes().iter().max().unwrap()
-        );
+        println!("\nSmallest face: {}", self.face_sizes().min().unwrap());
+        println!("\nLargest face: {}", self.face_sizes().max().unwrap());
         println!("\nGenus is {}", self.genus());
     }
 }
+
+// impl From<Lamination> for MarkedCycleCover {
+//     fn from(value: Lamination) -> Self {
+//         let max_angle = Angle(degree.pow(period.try_into().unwrap()) - 1);
+//
+//         let ray_sets = Vec::new();
+//
+//         let cycles_with_shifts = vec![None; max_angle.try_into().unwrap()];
+//         let point_classes = vec![None; max_angle.try_into().unwrap()];
+//
+//         let mut curve = Self {
+//             period,
+//             degree,
+//             crit_period,
+//             max_angle,
+//             ray_sets,
+//             cycles: cycles_with_shifts,
+//             cycle_classes: point_classes,
+//             vertices: Vec::new(),
+//             wakes: Vec::new(),
+//             edges: Vec::new(),
+//             faces: Vec::new(),
+//             visited_face_ids: HashSet::new(),
+//         };
+//         curve.run();
+//         curve
+//     }
+// }

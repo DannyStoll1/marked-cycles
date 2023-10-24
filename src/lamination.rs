@@ -1,113 +1,224 @@
-use crate::types::Period;
-use num_bigint::BigInt;
-use num_rational::Rational64;
-use std::collections::HashSet;
+use std::cmp::Ordering;
+
+use crate::types::{Period, RatAngle};
+use itertools::Itertools;
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct CachedRatAngle
+{
+    angle: RatAngle,
+    float_val: f64,
+}
+impl CachedRatAngle
+{
+    pub fn new(numer: Period, denom: Period) -> Self
+    {
+        let angle = RatAngle::new(numer, denom);
+        let float_val = (*angle.numer() as f64) / (*angle.denom() as f64);
+        Self { angle, float_val }
+    }
+}
+impl std::cmp::PartialOrd for CachedRatAngle
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering>
+    {
+        self.float_val.partial_cmp(&other.float_val)
+    }
+}
+impl From<RatAngle> for CachedRatAngle
+{
+    fn from(angle: RatAngle) -> Self
+    {
+        let float_val = (*angle.numer() as f64) / (*angle.denom() as f64);
+        Self { angle, float_val }
+    }
+}
+impl From<CachedRatAngle> for RatAngle
+{
+    fn from(cangle: CachedRatAngle) -> Self
+    {
+        cangle.angle
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CachedArc(CachedRatAngle, CachedRatAngle);
+impl From<CachedArc> for (RatAngle, RatAngle)
+{
+    fn from(carc: CachedArc) -> Self
+    {
+        (carc.0.into(), carc.1.into())
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct Endpoint
+{
+    angle: CachedRatAngle,
+    other: CachedRatAngle,
+    left: bool,
+}
+
+impl Endpoint
+{
+    #[must_use]
+    pub fn left(angle: CachedRatAngle, other: CachedRatAngle) -> Self
+    {
+        Self {
+            angle,
+            other,
+            left: true,
+        }
+    }
+    #[must_use]
+    pub fn right(angle: CachedRatAngle, other: CachedRatAngle) -> Self
+    {
+        Self {
+            angle,
+            other,
+            left: false,
+        }
+    }
+}
+
+impl std::cmp::PartialOrd for Endpoint
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering>
+    {
+        self.angle.partial_cmp(&other.angle)
+    }
+}
 
 pub struct Lamination
 {
-    crit_period: Period,
-    degree: Period,
+    pub crit_period: Period,
     max_period: Period,
-    size: Period,
-    arcs: Vec<(Period, Rational64, Rational64)>,
-    endpoints: HashSet<Rational64>,
-    period_cutoffs: Vec<Period>,
+    arcs: Vec<Vec<(RatAngle, RatAngle)>>,
+    endpoints: Vec<Endpoint>,
 }
 
 impl Lamination
 {
-    pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
+    #[must_use]
+    pub fn new() -> Self
     {
-        let mut lamination = Lamination {
-            crit_period,
-            degree,
+        let endpoints = vec![Endpoint::default()];
+
+        let arcs = vec![Vec::new(), vec![(RatAngle::new(0, 1), RatAngle::new(0, 1))]];
+
+        Self {
+            crit_period: 1,
             max_period: 1,
-            size: 1,
-            arcs: vec![(0, Rational64::new(0, 1), Rational64::new(0, 1))],
-            endpoints: HashSet::new(),
-            period_cutoffs: vec![0, 1],
-        };
-        lamination.endpoints.insert(Rational64::new(0, 1));
-        lamination.extend_to_period(period);
-        lamination
+            arcs,
+            endpoints,
+        }
+    }
+
+    #[must_use]
+    pub fn with_crit_period(mut self, crit_period: Period) -> Self
+    {
+        self.crit_period = crit_period;
+        self
+    }
+
+    #[must_use]
+    pub fn per2(mut self) -> Self
+    {
+        self.crit_period = 2;
+        self
     }
 
     fn extend(&mut self)
     {
         self.max_period += 1;
-        let n = self.degree.pow(self.max_period.try_into().unwrap()) - 1;
-        let mut counters: Vec<BigInt> = vec![BigInt::from(0); n as usize];
-        let neg_one = BigInt::from(-1);
+        let n = 2_i64.pow(self.max_period as u32) - 1;
 
-        for k in 0..n
-        {
-            if self
-                .endpoints
-                .contains(&Rational64::new(k as Period, n as Period))
-            {
-                counters[k as usize] = neg_one.clone();
-            }
-        }
-        if self.crit_period == 2
-        {
-            let lo = n / 3 + 1;
-            let hi = if n % 3 == 0 { 2 * n / 3 } else { 2 * n / 3 + 1 };
-            for k in lo..hi
-            {
-                counters[k as usize] = neg_one.clone();
-            }
-        }
+        let mut stack: Vec<Period> = Vec::new();
+        let mut arcs: Vec<CachedArc> = Vec::new();
 
-        for &(id, a, b) in self.arcs.iter()
+        let mut new_endpoints = Vec::new();
+        let mut endpoint_it = self.endpoints.iter().skip(1).peekable();
+
+        'outer: for k in (1..n).filter(|k| self.crit_period == 1 || k * 3 < n || k * 3 > 2 * n)
         {
-            let n_rat = Rational64::from(n as Period);
-            let lo = (n_rat * a).ceil().to_integer();
-            let hi = (n_rat * b).ceil().to_integer();
-            let counter_modification = BigInt::from(1) << id;
-            for k in lo..hi
+            let theta = CachedRatAngle::from(RatAngle::new(k, n));
+
+            'inner: while let Some(&curr) = endpoint_it.peek()
             {
-                if counters[k as usize] != neg_one
+                match curr.angle.partial_cmp(&theta)
                 {
-                    counters[k as usize] ^= counter_modification.clone();
+                    Some(Ordering::Less) =>
+                    {
+                        if curr.left
+                        {
+                            stack.push(0);
+                        }
+                        else
+                        {
+                            let top = stack.pop();
+                            debug_assert_eq!(top, Some(0));
+                        }
+                    }
+                    Some(Ordering::Equal) =>
+                    {
+                        if curr.left
+                        {
+                            stack.push(0);
+                        }
+                        else
+                        {
+                            let top = stack.pop();
+                            debug_assert_eq!(top, Some(0));
+                        }
+
+                        continue 'outer;
+                    }
+                    Some(Ordering::Greater) => break 'inner,
+                    None => panic!(
+                        "NaN encountered in comparison! curr.angle = {:?}, theta = {theta:?}",
+                        curr.angle
+                    ),
+                }
+                endpoint_it.next();
+            }
+
+            match stack.last()
+            {
+                Some(&j) if j != 0 =>
+                {
+                    let other = CachedRatAngle::new(j, n);
+                    new_endpoints.push(Endpoint::left(other, theta));
+                    new_endpoints.push(Endpoint::right(theta, other));
+                    arcs.push(CachedArc(other, theta));
+                    stack.pop();
+                }
+                _ =>
+                {
+                    stack.push(k);
                 }
             }
         }
 
-        let mut angles = std::collections::HashMap::new();
+        new_endpoints.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+        self.endpoints = self
+            .endpoints
+            .iter()
+            .cloned()
+            .merge(new_endpoints.into_iter())
+            .collect();
+        arcs.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
-        for (k, &ref counter) in counters.iter().enumerate().skip(1)
-        {
-            if *counter == neg_one
-            {
-                continue;
-            }
-
-            if let Some(&angle) = angles.get(&counter)
-            {
-                let id = self.size;
-                self.arcs
-                    .push((id, angle, Rational64::new(k as Period, n as Period)));
-                self.size += 1;
-                self.endpoints.insert(angle);
-                self.endpoints
-                    .insert(Rational64::new(k as Period, n as Period));
-                angles.remove(&counter);
-            }
-            else
-            {
-                angles.insert(counter, Rational64::new(k as Period, n as Period));
-            }
-        }
-
-        self.period_cutoffs.push(self.size);
+        self.arcs.push(arcs.into_iter().map(Into::into).collect());
     }
 
-    fn len(&self) -> Period
+    const fn len(&self) -> Period
     {
-        self.size
+        self.max_period
     }
 
-    fn extend_to_period(&mut self, period: Period)
+    pub fn extend_to_period(&mut self, period: Period)
     {
         for _ in self.max_period..(period as Period)
         {
@@ -115,68 +226,58 @@ impl Lamination
         }
     }
 
-    pub fn arcs_of_period(&self, per: Period, sort: bool) -> Vec<(Rational64, Rational64)>
+    #[must_use]
+    pub fn arcs_of_period(&mut self, per: Period) -> &Vec<(RatAngle, RatAngle)>
     {
-        let i = self.period_cutoffs[per as usize - 1] as usize;
-        let j = self.period_cutoffs[per as usize] as usize;
-        let mut out = self.arcs[i..j]
-            .iter()
-            .map(|(_, a, b)| (*a, *b))
-            .collect::<Vec<_>>();
-        if sort
+        self.extend_to_period(per);
+        if per <= 0
         {
-            out.sort_by(|(a, _), (b, _)| a.cmp(b));
+            return &self.arcs[0];
         }
-        out
+
+        &self.arcs[per as usize]
     }
 
-    fn arc_lengths_of_period(&self, per: Period) -> Vec<Rational64>
+    #[must_use]
+    pub fn into_arcs_of_period(mut self, per: Period) -> Vec<(RatAngle, RatAngle)>
     {
-        let i = self.period_cutoffs[per as usize - 1] as usize;
-        let j = self.period_cutoffs[per as usize] as usize;
-        self.arcs[i..j]
-            .iter()
-            .map(|(_, a, b)| b - a)
-            .collect::<Vec<_>>()
+        self.extend_to_period(per);
+        if per <= 0
+        {
+            return std::mem::take(&mut self.arcs[0]);
+        }
+
+        return std::mem::take(&mut self.arcs[per as usize]);
     }
 
-    fn arc_lengths_cumulative(&self, max_per: Period) -> Vec<Rational64>
+    #[must_use]
+    pub fn into_arcs(mut self, per: Period) -> Vec<Vec<(RatAngle, RatAngle)>>
     {
-        let j = if max_per == -1
-        {
-            self.arcs.len()
-        }
-        else
-        {
-            self.period_cutoffs[max_per as usize] as usize
-        };
-        self.arcs[..j]
-            .iter()
-            .map(|(_, a, b)| b - a)
-            .collect::<Vec<_>>()
+        self.extend_to_period(per);
+        self.arcs
     }
 
-    fn arc_lengths_cumulative_set(&self, max_per: Period) -> HashSet<Rational64>
+    fn arc_lengths_of_period(&mut self, per: Period) -> Vec<RatAngle>
     {
-        let j = if max_per == -1
-        {
-            self.arcs.len()
-        }
-        else
-        {
-            self.period_cutoffs[max_per as usize] as usize
-        };
-        self.arcs[..j]
+        self.arcs_of_period(per)
             .iter()
-            .map(|(_, a, b)| b - a)
-            .collect::<HashSet<_>>()
+            .map(|(a, b)| b - a)
+            .collect()
+    }
+}
+
+impl Default for Lamination
+{
+    fn default() -> Self
+    {
+        Self::new()
     }
 }
 
 fn main()
 {
-    let lamination = Lamination::new(10, 2, 1);
-    let arcs = lamination.arcs_of_period(9, true);
+    let mut lamination = Lamination::new();
+    let arcs = lamination.arcs_of_period(9);
     for (a, b) in arcs
     {
         println!(

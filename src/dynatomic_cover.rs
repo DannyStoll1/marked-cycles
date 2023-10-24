@@ -23,7 +23,7 @@ fn get_orbit(angle: Angle, max_angle: Angle, period: Period, degree: Period) -> 
     orbit
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DynatomicCover
 {
     pub period: Period,
@@ -43,14 +43,15 @@ pub struct DynatomicCover
 
 impl DynatomicCover
 {
+    #[must_use]
     pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
     {
-        let max_angle = Angle(degree.pow(period.try_into().unwrap()) - 1);
+        let max_angle = Angle(degree.pow(period.try_into().unwrap_or_default()) - 1);
 
         let ray_sets = Vec::new();
 
-        let cycles_with_shifts = vec![None; max_angle.try_into().unwrap()];
-        let point_classes = vec![None; max_angle.try_into().unwrap()];
+        let cycles_with_shifts = vec![None; max_angle.try_into().unwrap_or_default()];
+        let point_classes = vec![None; max_angle.try_into().unwrap_or_default()];
 
         let mut curve = Self {
             period,
@@ -73,14 +74,16 @@ impl DynatomicCover
 
     fn compute_ray_sets(&mut self)
     {
-        let lamination = Lamination::new(self.period, self.degree, self.crit_period);
-        for angles in lamination.arcs_of_period(self.period, true)
-        {
-            self.ray_sets.push((
-                (angles.0 * (self.max_angle.0 as i64)).to_integer().into(),
-                (angles.1 * (self.max_angle.0 as i64)).to_integer().into(),
-            ));
-        }
+        Lamination::new()
+            .with_crit_period(self.crit_period)
+            .arcs_of_period(self.period)
+            .iter()
+            .for_each(|angles| {
+                self.ray_sets.push((
+                    (angles.0 * self.max_angle.0).to_integer().into(),
+                    (angles.1 * self.max_angle.0).to_integer().into(),
+                ));
+            });
         self.ray_sets.sort();
     }
 
@@ -88,7 +91,7 @@ impl DynatomicCover
     {
         for theta in 0..self.max_angle.into()
         {
-            let theta_usize = usize::try_from(theta).unwrap();
+            let theta_usize = usize::try_from(theta).unwrap_or_default();
             if self.cycles_with_shifts[theta_usize].is_some()
             {
                 continue;
@@ -104,7 +107,7 @@ impl DynatomicCover
 
                 orbit
                     .iter()
-                    .map(|x| usize::try_from(*x).unwrap())
+                    .map(|x| usize::try_from(*x).unwrap_or_default())
                     .enumerate()
                     .for_each(|(i, x)| {
                         let shift = ((i as i64) - (rep_idx as i64)).rem_euclid(self.period);
@@ -140,8 +143,8 @@ impl DynatomicCover
                 let cycle0 = self.cycles_with_shifts[usize::try_from(*theta0).unwrap()].unwrap();
                 let cycle1 = self.cycles_with_shifts[usize::try_from(*theta1).unwrap()].unwrap();
                 Wake {
-                    theta0: cycle0.into(),
-                    theta1: cycle1.into(),
+                    theta0: cycle0,
+                    theta1: cycle1,
                 }
             })
             .collect();
@@ -155,7 +158,7 @@ impl DynatomicCover
                     end: w.theta1.rotate(i),
                 })
             })
-            .collect()
+            .collect();
     }
 
     pub fn run(&mut self)
@@ -167,31 +170,37 @@ impl DynatomicCover
         self.compute_faces();
     }
 
+    #[must_use]
     pub fn euler_characteristic(&self) -> isize
     {
         self.num_vertices() as isize - self.num_edges() as isize + self.num_faces() as isize
     }
 
+    #[must_use]
     pub fn num_vertices(&self) -> usize
     {
         self.vertices.len()
     }
 
+    #[must_use]
     pub fn num_edges(&self) -> usize
     {
         self.edges.len()
     }
 
+    #[must_use]
     pub fn num_faces(&self) -> usize
     {
         self.primitive_faces.len() + self.satellite_faces.len()
     }
 
+    #[must_use]
     pub fn genus(&self) -> isize
     {
         1 - self.euler_characteristic() / 2
     }
 
+    #[must_use]
     pub fn face_sizes(&self) -> Vec<usize>
     {
         let primitive_sizes = self.primitive_faces.iter().map(|f| f.vertices.len());
@@ -201,11 +210,13 @@ impl DynatomicCover
         primitive_sizes.chain(satellite_sizes).collect()
     }
 
+    #[must_use]
     pub fn num_odd_faces(&self) -> usize
     {
         self.face_sizes().iter().filter(|&s| s % 2 == 1).count()
     }
 
+    #[must_use]
     pub fn orbit(&self, angle: Angle) -> Vec<Angle>
     {
         get_orbit(angle, self.max_angle, self.period, self.degree)
@@ -291,10 +302,7 @@ impl DynatomicCover
                     degree: face_degree,
                 });
             }
-            else
-            {
-                self.visited_face_ids.insert(node.to_point_class());
-            }
+            self.visited_face_ids.insert(node.to_point_class());
 
             face_degree += 1;
         }

@@ -2,18 +2,10 @@
 
 use clap::Parser;
 
-pub mod abstract_cycles;
-pub mod combinatorics;
-pub mod dynatomic_cover;
-pub mod lamination;
-pub mod marked_cycle_cover;
-pub mod types;
-
-use combinatorics::MarkedCycleCombinatorics;
-use marked_cycle_cover::MarkedCycleCover;
-use types::Period;
-
-use crate::dynatomic_cover::DynatomicCover;
+use marked_cycles::combinatorics::MarkedCycleCombinatorics;
+use marked_cycles::dynatomic_cover::DynatomicCover;
+use marked_cycles::marked_cycle_cover::MarkedCycleCover;
+use marked_cycles::types::Period;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -80,7 +72,7 @@ fn print_data_table(args: &Args)
     {
         if args.dynatomic
         {
-            println!("\nData table not yet supported for dynatomic curves.");
+            println!("\nData table not yet implemented for dynatomic curves.");
             return;
         }
         print_row!("period", "vertices", "edges", "faces", "genus");

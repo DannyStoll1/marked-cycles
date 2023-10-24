@@ -1,9 +1,9 @@
 use crate::{
     abstract_cycles::{AbstractPointClass, ShiftedCycle},
-    types::{Angle, Period},
+    types::Period,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct PrimitiveFace
 {
     pub label: AbstractPointClass,
@@ -69,7 +69,7 @@ impl std::fmt::Binary for PrimitiveFace
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SatelliteFace
 {
     pub label: ShiftedCycle,
@@ -119,16 +119,11 @@ impl std::fmt::Binary for SatelliteFace
             .iter()
             .map(|v| format!("{:b}", v.to_point()))
             .collect();
-        write!(
-            f,
-            "{:b} = ({})",
-            self.label,
-            vertices_as_strings.join(", ")
-        )
+        write!(f, "{:b} = ({})", self.label, vertices_as_strings.join(", "))
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Wake
 {
     pub theta0: ShiftedCycle,
@@ -161,7 +156,7 @@ impl std::fmt::Display for Wake
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Edge
 {
     pub start: ShiftedCycle,

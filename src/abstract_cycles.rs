@@ -11,7 +11,7 @@ pub struct AbstractPoint
 impl AbstractPoint
 {
     #[must_use]
-    pub fn new(angle: Angle, period: Period) -> Self
+    pub const fn new(angle: Angle, period: Period) -> Self
     {
         let max_angle = Angle((1 << period) - 1);
         Self {
@@ -22,7 +22,7 @@ impl AbstractPoint
     }
 
     #[must_use]
-    pub fn with_angle(&self, angle: Angle) -> Self
+    pub const fn with_angle(&self, angle: Angle) -> Self
     {
         Self {
             angle,
@@ -31,6 +31,7 @@ impl AbstractPoint
         }
     }
 
+    #[must_use]
     pub fn orbit_min(&self) -> Self
     {
         let mut theta = self.angle;
@@ -44,12 +45,14 @@ impl AbstractPoint
         self.with_angle(min_theta)
     }
 
+    #[must_use]
     pub fn rotate(&self, shift: Period) -> Self
     {
         let rep = (self.angle << shift) % self.max_angle;
         self.with_angle(rep)
     }
 
+    #[must_use]
     pub fn bit_flip(&self) -> Self
     {
         self.with_angle(self.max_angle & !self.angle)
@@ -127,7 +130,9 @@ impl AbstractCycle
         }
     }
 
-    pub fn compute_cycle_class(&self) -> AbstractCycleClass {
+    #[must_use]
+    pub fn compute_cycle_class(&self) -> AbstractCycleClass
+    {
         let dual_rep = self.rep.bit_flip().orbit_min();
         AbstractCycleClass {
             rep: self.rep.min(dual_rep),
@@ -200,7 +205,7 @@ pub struct ShiftedCycle
 impl ShiftedCycle
 {
     #[must_use]
-    pub fn with_shift(self, shift: Period) -> Self
+    pub const fn with_shift(self, shift: Period) -> Self
     {
         Self {
             rep: self.rep,
@@ -208,19 +213,22 @@ impl ShiftedCycle
         }
     }
 
-    pub fn matches(&self, other: ShiftedCycle) -> bool
+    #[must_use]
+    pub fn matches(&self, other: Self) -> bool
     {
         self.rep == other.rep
     }
 
     // Get shift of self relative to another shifted cycle
-    pub fn relative_shift(&self, other: ShiftedCycle) -> Period
+    #[must_use]
+    pub const fn relative_shift(&self, other: Self) -> Period
     {
         (self.shift - other.shift).rem_euclid(self.rep.period)
     }
 
     // Return a copy of self, rotated by a given shift
-    pub fn rotate(&self, shift: Period) -> Self
+    #[must_use]
+    pub const fn rotate(&self, shift: Period) -> Self
     {
         let new_shift = (self.shift + shift).rem_euclid(self.rep.period);
         Self {
@@ -229,24 +237,28 @@ impl ShiftedCycle
         }
     }
 
+    #[must_use]
     #[inline]
     pub fn to_point(&self) -> AbstractPoint
     {
         self.rep.rotate(self.shift)
     }
 
+    #[must_use]
     #[inline]
     pub fn into_point(self) -> AbstractPoint
     {
         self.rep.rotate(self.shift)
     }
 
+    #[must_use]
     #[inline]
     pub fn to_point_class(&self) -> AbstractPointClass
     {
         self.rep.rotate(self.shift).into()
     }
 
+    #[must_use]
     #[inline]
     pub fn into_point_class(self) -> AbstractPointClass
     {
