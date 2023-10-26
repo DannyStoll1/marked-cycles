@@ -91,6 +91,8 @@ impl std::cmp::PartialOrd for Endpoint
     }
 }
 
+/// Implementation of Lavaurs' algorithm to compute the lamination for the combinatorial Mandelbrot
+/// set.
 pub struct Lamination
 {
     pub crit_period: Period,

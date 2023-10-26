@@ -1,0 +1,8 @@
+ff-version: 1.2.0
+message: "This is free software, and may be freely used and modified in accordance with the GPL. However, if you would like to cite this for research purposes, you may do as as below."
+authors:
+  - family-names: Stoll
+    given-names: Danny
+title: "Dynatomic Cell Structure Implementation"
+version: 0.2.0
+date-released: 2023-10-25
