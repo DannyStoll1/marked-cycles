@@ -82,6 +82,14 @@ impl Endpoint
     }
 }
 
+impl From<Endpoint> for (RatAngle, RatAngle)
+{
+    fn from(endpt: Endpoint) -> Self
+    {
+        (endpt.angle.into(), endpt.other.into())
+    }
+}
+
 impl std::cmp::PartialOrd for Endpoint
 {
     #[inline]
@@ -93,6 +101,7 @@ impl std::cmp::PartialOrd for Endpoint
 
 /// Implementation of Lavaurs' algorithm to compute the lamination for the combinatorial Mandelbrot
 /// set.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Lamination
 {
     pub crit_period: Period,
@@ -138,7 +147,6 @@ impl Lamination
         let n = 2_i64.pow(self.max_period as u32) - 1;
 
         let mut stack: Vec<Period> = Vec::new();
-        let mut arcs: Vec<CachedArc> = Vec::new();
 
         let mut new_endpoints = Vec::new();
         let mut endpoint_it = self.endpoints.iter().skip(1).peekable();
@@ -165,16 +173,7 @@ impl Lamination
                     }
                     Some(Ordering::Equal) =>
                     {
-                        if curr.left
-                        {
-                            stack.push(0);
-                        }
-                        else
-                        {
-                            let top = stack.pop();
-                            debug_assert_eq!(top, Some(0));
-                        }
-
+                        endpoint_it.next();
                         continue 'outer;
                     }
                     Some(Ordering::Greater) => break 'inner,
@@ -193,7 +192,6 @@ impl Lamination
                     let other = CachedRatAngle::new(j, n);
                     new_endpoints.push(Endpoint::left(other, theta));
                     new_endpoints.push(Endpoint::right(theta, other));
-                    arcs.push(CachedArc(other, theta));
                     stack.pop();
                 }
                 _ =>
@@ -204,15 +202,21 @@ impl Lamination
         }
 
         new_endpoints.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+
         self.endpoints = self
             .endpoints
             .iter()
             .cloned()
-            .merge(new_endpoints.into_iter())
+            .merge(new_endpoints.iter().cloned())
             .collect();
-        arcs.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
-        self.arcs.push(arcs.into_iter().map(Into::into).collect());
+        let new_arcs = new_endpoints
+            .into_iter()
+            .filter(|e| e.left)
+            .map(Into::into)
+            .collect();
+
+        self.arcs.push(new_arcs);
     }
 
     const fn len(&self) -> Period
