@@ -35,7 +35,7 @@ pub struct Angle(pub Period);
 
 impl Angle
 {
-    fn scale_by_ratio(&self, ratio: Rational64) -> Self
+    pub fn scale_by_ratio(&self, ratio: &Rational64) -> Self
     {
         let theta = (ratio * self.0).to_integer();
         Self(theta)

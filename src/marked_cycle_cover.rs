@@ -31,7 +31,6 @@ pub struct MarkedCycleCover
     max_angle: Angle,
     ray_sets: Vec<(Angle, Angle)>,
     pub cycles: Vec<Option<AbstractCycle>>,
-    pub cycle_classes: Vec<Option<AbstractCycleClass>>,
     pub vertices: Vec<AbstractCycle>,
     pub wakes: Vec<Wake>,
     pub edges: Vec<Edge>,
@@ -48,7 +47,6 @@ impl MarkedCycleCover
         let ray_sets = Vec::new();
 
         let cycles_with_shifts = vec![None; max_angle.try_into().unwrap()];
-        let point_classes = vec![None; max_angle.try_into().unwrap()];
 
         let mut curve = Self {
             period,
@@ -57,7 +55,6 @@ impl MarkedCycleCover
             max_angle,
             ray_sets,
             cycles: cycles_with_shifts,
-            cycle_classes: point_classes,
             vertices: Vec::new(),
             wakes: Vec::new(),
             edges: Vec::new(),
@@ -74,10 +71,10 @@ impl MarkedCycleCover
             .with_crit_period(self.crit_period)
             .arcs_of_period(self.period)
             .iter()
-            .for_each(|angles| {
+            .for_each(|(theta0, theta1)| {
                 self.ray_sets.push((
-                    (angles.0 * self.max_angle.0).to_integer().into(),
-                    (angles.1 * self.max_angle.0).to_integer().into(),
+                    (self.max_angle.scale_by_ratio(theta0)).into(),
+                    (self.max_angle.scale_by_ratio(theta1)).into(),
                 ));
             });
         self.ray_sets.sort();
@@ -105,7 +102,6 @@ impl MarkedCycleCover
                     .for_each(|x| {
                         let cycle = AbstractCycle { rep: cycle_rep };
                         self.cycles[x] = Some(cycle);
-                        self.cycle_classes[x] = Some(cycle.into());
                     });
             }
         }
@@ -195,32 +191,30 @@ impl MarkedCycleCover
         get_orbit(angle, self.max_angle, self.period, self.degree)
     }
 
-    // Should only be called when cycle classes have already been computed
-    fn get_cycle_class(&self, cycle: AbstractCycle) -> AbstractCycleClass
-    {
-        self.cycle_classes[usize::try_from(cycle.rep.angle).unwrap()].unwrap()
-    }
-
     fn compute_faces(&mut self)
     {
-        self.visited_face_ids.clear();
-
+        let mut visited = HashSet::new();
         self.faces = self
             .vertices
-            .clone()
             .iter()
-            .filter_map(|cyc| self.traverse_face(*cyc))
+            .cloned()
+            .filter_map(|cyc| {
+                if visited.contains(&cyc) {
+                    return None
+                }
+                let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
+                let dual = self.cycles[k]?;
+                visited.insert(dual);
+                let face_id = AbstractCycleClass::new_raw(cyc.rep.min(dual.rep));
+                Some(self.traverse_face(face_id))
+            })
             .collect();
     }
 
-    fn traverse_face(&mut self, starting_point: AbstractCycle) -> Option<Face>
+    fn traverse_face(&self, face_id: AbstractCycleClass) -> Face
     {
-        let face_id = self.get_cycle_class(starting_point);
-        if self.visited_face_ids.contains(&face_id)
-        {
-            return None;
-        }
 
+        let starting_point = face_id.into();
         let mut node = starting_point;
         let mut nodes = Vec::new();
         nodes.push(node);
@@ -229,7 +223,7 @@ impl MarkedCycleCover
 
         loop
         {
-            for Wake { theta0, theta1 } in &self.wakes
+            for Edge { start: theta0, end: theta1 } in &self.edges
             {
                 if node == *theta0
                 {
@@ -250,13 +244,12 @@ impl MarkedCycleCover
                 {
                     nodes.pop();
                 }
-                return Some(Face {
+                return Face {
                     label: starting_point.into(),
                     vertices: nodes,
                     degree: face_degree,
-                });
+                };
             }
-            self.visited_face_ids.insert(self.get_cycle_class(node));
 
             face_degree += 1;
         }

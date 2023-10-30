@@ -114,7 +114,7 @@ impl std::fmt::Display for AbstractPointClass
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AbstractCycle
 {
     pub rep: AbstractPoint,
@@ -170,12 +170,27 @@ impl AbstractCycleClass
             rep: cycle.rep.min(dual_rep),
         }
     }
+
+    #[must_use]
+    pub fn new_raw(rep: AbstractPoint) -> Self
+    {
+        Self {
+            rep
+        }
+    }
 }
 impl From<AbstractCycle> for AbstractCycleClass
 {
     fn from(cycle: AbstractCycle) -> Self
     {
         Self::new_compute(cycle)
+    }
+}
+impl From<AbstractCycleClass> for AbstractCycle
+{
+    fn from(cycle_class: AbstractCycleClass) -> Self
+    {
+        Self { rep: cycle_class.rep }
     }
 }
 
