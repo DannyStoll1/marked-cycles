@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod abstract_cycles;
+pub mod arithmetic;
 pub mod combinatorics;
 pub mod dynatomic_cover;
 pub mod lamination;

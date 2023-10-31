@@ -1,6 +1,6 @@
 use crate::types::{IntAngle, Period};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AbstractPoint
 {
     pub angle: IntAngle,
@@ -56,6 +56,21 @@ impl AbstractPoint
     pub fn bit_flip(&self) -> Self
     {
         self.with_angle(self.max_angle & !self.angle)
+    }
+}
+
+impl PartialOrd for AbstractPoint
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering>
+    {
+        Some(self.angle.cmp(&other.angle))
+    }
+}
+impl Ord for AbstractPoint
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering
+    {
+        self.angle.cmp(&other.angle)
     }
 }
 
@@ -174,9 +189,7 @@ impl AbstractCycleClass
     #[must_use]
     pub fn new_raw(rep: AbstractPoint) -> Self
     {
-        Self {
-            rep
-        }
+        Self { rep }
     }
 }
 impl From<AbstractCycle> for AbstractCycleClass
@@ -190,7 +203,9 @@ impl From<AbstractCycleClass> for AbstractCycle
 {
     fn from(cycle_class: AbstractCycleClass) -> Self
     {
-        Self { rep: cycle_class.rep }
+        Self {
+            rep: cycle_class.rep,
+        }
     }
 }
 
@@ -241,9 +256,9 @@ impl ShiftedCycle
         (self.shift - other.shift).rem_euclid(self.rep.period)
     }
 
-    // Return a copy of self, rotated by a given shift
+    // Return self, rotated by a given shift
     #[must_use]
-    pub const fn rotate(&self, shift: Period) -> Self
+    pub const fn rotate(self, shift: Period) -> Self
     {
         let new_shift = (self.shift + shift).rem_euclid(self.rep.period);
         Self {
@@ -254,28 +269,14 @@ impl ShiftedCycle
 
     #[must_use]
     #[inline]
-    pub fn to_point(&self) -> AbstractPoint
+    pub fn to_point(self) -> AbstractPoint
     {
         self.rep.rotate(self.shift)
     }
 
     #[must_use]
     #[inline]
-    pub fn into_point(self) -> AbstractPoint
-    {
-        self.rep.rotate(self.shift)
-    }
-
-    #[must_use]
-    #[inline]
-    pub fn to_point_class(&self) -> AbstractPointClass
-    {
-        self.rep.rotate(self.shift).into()
-    }
-
-    #[must_use]
-    #[inline]
-    pub fn into_point_class(self) -> AbstractPointClass
+    pub fn to_point_class(self) -> AbstractPointClass
     {
         self.rep.rotate(self.shift).into()
     }
@@ -285,7 +286,7 @@ impl From<ShiftedCycle> for AbstractPoint
 {
     fn from(value: ShiftedCycle) -> Self
     {
-        value.into_point()
+        value.to_point()
     }
 }
 

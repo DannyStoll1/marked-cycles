@@ -1,7 +1,7 @@
 use crate::abstract_cycles::{AbstractPoint, AbstractPointClass, ShiftedCycle};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 mod cells;
 use cells::{Edge, PrimitiveFace, SatelliteFace, Wake};
@@ -23,79 +23,66 @@ fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAng
     orbit
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct DynatomicCover
+#[derive(Debug, PartialEq)]
+pub struct DynatomicCoverBuilder
 {
     pub period: Period,
     pub crit_period: Period,
     max_angle: IntAngle,
-    ray_sets: Vec<(IntAngle, IntAngle)>,
-    pub cycles_with_shifts: Vec<Option<ShiftedCycle>>,
-    pub point_classes: Vec<Option<AbstractPointClass>>,
-    pub vertices: Vec<ShiftedCycle>,
-    pub wakes: Vec<Wake>,
-    pub edges: Vec<Edge>,
-    pub primitive_faces: Vec<PrimitiveFace>,
-    pub satellite_faces: Vec<SatelliteFace>,
-    visited_face_ids: HashSet<AbstractPointClass>,
+    adjacency_map: HashMap<AbstractPoint, Vec<(ShiftedCycle, Period, IntAngle)>>,
 }
 
-impl DynatomicCover
+impl DynatomicCoverBuilder
 {
     #[must_use]
     pub fn new(period: Period, crit_period: Period) -> Self
     {
-        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap_or_default()) - 1);
+        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap()) - 1);
 
-        let ray_sets = Vec::new();
-
-        let cycles_with_shifts = vec![None; max_angle.try_into().unwrap_or_default()];
-        let point_classes = vec![None; max_angle.try_into().unwrap_or_default()];
-
-        let mut curve = Self {
+        Self {
             period,
             crit_period,
             max_angle,
-            ray_sets,
-            cycles_with_shifts,
-            point_classes,
-            vertices: Vec::new(),
-            wakes: Vec::new(),
-            edges: Vec::new(),
-            primitive_faces: Vec::new(),
-            satellite_faces: Vec::new(),
-            visited_face_ids: HashSet::new(),
-        };
-        curve.run();
-        curve
+            adjacency_map: HashMap::new(),
+        }
     }
 
-    fn compute_ray_sets(&mut self)
+    #[must_use]
+    pub fn build(&mut self) -> DynatomicCover
     {
-        Lamination::new()
-            .with_crit_period(self.crit_period)
-            .arcs_of_period(self.period)
-            .iter()
-            .for_each(|angles| {
-                self.ray_sets.push((
-                    (angles.0 * self.max_angle.0).to_integer().into(),
-                    (angles.1 * self.max_angle.0).to_integer().into(),
-                ));
-            });
-        self.ray_sets.sort();
+        let cycles = self.cycles();
+        let wakes = self.wakes(&cycles);
+        let vertices = self.vertices(&cycles);
+        let edges = self.edges(&wakes);
+        let primitive_faces = self.primitive_faces(&vertices);
+        let satellite_faces = self.satellite_faces(&wakes);
+
+        DynatomicCover {
+            period: self.period,
+            crit_period: self.crit_period,
+            vertices,
+            edges,
+            primitive_faces,
+            satellite_faces,
+        }
     }
 
-    fn compute_cycles(&mut self)
+    #[inline]
+    fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
     {
+        get_orbit(angle, self.max_angle, self.period)
+    }
+
+    fn cycles(&self) -> Vec<Option<ShiftedCycle>>
+    {
+        let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
         for theta in 0..self.max_angle.into()
         {
-            let theta_usize = usize::try_from(theta).unwrap_or_default();
-            if self.cycles_with_shifts[theta_usize].is_some()
+            let theta_usize = usize::try_from(theta).unwrap();
+            if cycles[theta_usize].is_some()
             {
                 continue;
             }
-
-            let point = AbstractPoint::new(theta.into(), self.period);
 
             let orbit = self.orbit(theta.into());
             if orbit.len() == self.period as usize
@@ -113,42 +100,65 @@ impl DynatomicCover
                             rep: cycle_rep,
                             shift,
                         };
-                        self.cycles_with_shifts[x] = Some(shifted_cycle);
+                        cycles[x] = Some(shifted_cycle);
                     });
-                // FIXME: should this be moved into the loop?
-                self.point_classes[theta_usize] = Some(point.into());
             }
         }
+        if self.period == 1
+        {
+            let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
+            cycles.push(Some(ShiftedCycle {
+                rep: alpha_fp,
+                shift: 0,
+            }));
+        }
+        cycles
     }
 
-    fn compute_vertices(&mut self)
+    fn vertices(&self, cycles: &[Option<ShiftedCycle>]) -> Vec<ShiftedCycle>
     {
         // Vertices, labeled by abstract point
-        self.vertices = self
-            .cycles_with_shifts
-            .iter()
-            .filter_map(|&v| v)
-            .collect::<Vec<_>>();
+        cycles.iter().filter_map(|&v| v).collect::<Vec<_>>()
     }
 
-    fn compute_edges(&mut self)
+    fn wakes(&mut self, cycles: &[Option<ShiftedCycle>]) -> Vec<Wake>
     {
         // Leaves of lamination, labeled by shifted cycle
-        self.wakes = self
-            .ray_sets
-            .iter()
-            .map(|(theta0, theta1)| {
-                let cycle0 = self.cycles_with_shifts[usize::try_from(*theta0).unwrap()].unwrap();
-                let cycle1 = self.cycles_with_shifts[usize::try_from(*theta1).unwrap()].unwrap();
-                Wake {
-                    theta0: cycle0,
-                    theta1: cycle1,
-                }
-            })
-            .collect();
+        Lamination::new()
+            .with_crit_period(self.crit_period)
+            .into_arcs_of_period(self.period)
+            .into_iter()
+            .filter_map(|(theta0, theta1)| {
+                let angle0 = self.max_angle.scale_by_ratio(&theta0);
+                let angle1 = self.max_angle.scale_by_ratio(&theta1);
 
-        self.edges = self
-            .wakes
+                let k0 = usize::try_from(angle0).ok()?;
+                let k1 = usize::try_from(angle1).ok()?;
+
+                let cyc0 = cycles[k0]?;
+                let cyc1 = cycles[k1]?;
+
+                let tag = angle0.max(angle1);
+                self.adjacency_map
+                    .entry(cyc0.rep)
+                    .or_insert_with(Vec::new)
+                    .push((cyc1, cyc0.shift, tag));
+                self.adjacency_map
+                    .entry(cyc1.rep)
+                    .or_insert_with(Vec::new)
+                    .push((cyc0, cyc1.shift, tag));
+
+                Some(Wake {
+                    theta0: cyc0,
+                    theta1: cyc1,
+                })
+            })
+            .collect()
+    }
+
+    fn edges(&mut self, wakes: &[Wake]) -> Vec<Edge>
+    {
+        wakes
             .iter()
             .flat_map(|w| {
                 (0..self.period).map(|i| Edge {
@@ -156,16 +166,129 @@ impl DynatomicCover
                     end: w.theta1.rotate(i),
                 })
             })
-            .collect();
+            .collect()
     }
 
-    pub fn run(&mut self)
+    fn satellite_faces(&self, wakes: &[Wake]) -> Vec<SatelliteFace>
     {
-        self.compute_ray_sets();
-        self.compute_cycles();
-        self.compute_vertices();
-        self.compute_edges();
-        self.compute_faces();
+        wakes
+            .iter()
+            .filter(|e| e.is_satellite())
+            .flat_map(|e| {
+                let shift = e.theta1.relative_shift(e.theta0);
+                let num_faces = shift.gcd(&self.period);
+                let face_period = self.period / num_faces;
+                (0..num_faces).map(move |i| {
+                    let base_point = e.theta0.with_shift(0).rotate(i);
+                    SatelliteFace {
+                        label: base_point,
+                        vertices: (0..face_period)
+                            .map(|j| base_point.rotate(j * num_faces))
+                            .collect(),
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn primitive_faces(
+        &self,
+        vertices: &[ShiftedCycle],
+    ) -> Vec<PrimitiveFace>
+    {
+        let mut visited = HashSet::new();
+        vertices
+            .iter()
+            .filter_map(|cyc| {
+                let face_id = cyc.to_point_class();
+                if visited.contains(&face_id)
+                {
+                    return None;
+                }
+                visited.insert(face_id);
+
+                Some(self.traverse_face(face_id, *cyc))
+            })
+            .collect()
+    }
+
+    fn traverse_face(
+        &self,
+        face_id: AbstractPointClass,
+        starting_point: ShiftedCycle,
+    ) -> PrimitiveFace
+    {
+        // cycle that is currently marked
+        let mut node: ShiftedCycle = starting_point;
+
+        // angle of the current parameter
+        let mut curr_angle = IntAngle(0);
+
+        let mut nodes = Vec::new();
+
+        let mut face_degree = 1;
+
+        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle)
+        {
+            // If we are crossing the real axis
+            if curr_angle >= next_angle
+            {
+                if node.rep.angle == starting_point.rep.angle
+                {
+                    break;
+                }
+                face_degree += 1;
+            }
+
+            nodes.push(node);
+            node = next_node;
+
+            curr_angle = next_angle;
+        }
+
+        if nodes.is_empty()
+        {
+            nodes.push(node);
+        }
+
+        return PrimitiveFace {
+            label: face_id,
+            vertices: nodes,
+            degree: face_degree,
+        };
+    }
+
+    fn get_next_vertex_and_angle(
+        &self,
+        node: ShiftedCycle,
+        curr_angle: IntAngle,
+    ) -> Option<(ShiftedCycle, IntAngle)>
+    {
+        self.adjacency_map
+            .get(&node.rep)?
+            .iter()
+            .min_by_key(|(_, _, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(self.max_angle.0))
+            .map(|(beta, alpha_shift, ang)| (beta.rotate(node.shift - alpha_shift), *ang))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DynatomicCover
+{
+    pub period: Period,
+    pub crit_period: Period,
+    pub vertices: Vec<ShiftedCycle>,
+    pub edges: Vec<Edge>,
+    pub primitive_faces: Vec<PrimitiveFace>,
+    pub satellite_faces: Vec<SatelliteFace>,
+}
+
+impl DynatomicCover
+{
+    #[must_use]
+    pub fn new(period: Period, crit_period: Period) -> Self
+    {
+        DynatomicCoverBuilder::new(period, crit_period).build()
     }
 
     #[must_use]
@@ -212,98 +335,6 @@ impl DynatomicCover
     pub fn num_odd_faces(&self) -> usize
     {
         self.face_sizes().iter().filter(|&s| s % 2 == 1).count()
-    }
-
-    #[must_use]
-    pub fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
-    {
-        get_orbit(angle, self.max_angle, self.period)
-    }
-
-    fn compute_faces(&mut self)
-    {
-        self.visited_face_ids.clear();
-
-        self.primitive_faces = self
-            .vertices
-            .clone()
-            .iter()
-            .filter_map(|scycle| self._traverse_face(*scycle))
-            .collect();
-
-        self.satellite_faces = self
-            .wakes
-            .iter()
-            .filter(|e| e.is_satellite())
-            .flat_map(|e| {
-                let shift = e.theta1.relative_shift(e.theta0);
-                let num_faces = shift.gcd(&self.period);
-                let face_period = self.period / num_faces;
-                (0..num_faces).map(move |i| {
-                    let base_point = e.theta0.with_shift(0).rotate(i);
-                    SatelliteFace {
-                        label: base_point,
-                        vertices: (0..face_period)
-                            .map(|j| base_point.rotate(j * num_faces))
-                            .collect(),
-                    }
-                })
-            })
-            .collect();
-    }
-
-    fn _traverse_face(&mut self, starting_point: ShiftedCycle) -> Option<PrimitiveFace>
-    {
-        if self
-            .visited_face_ids
-            .contains(&starting_point.to_point_class())
-        {
-            return None;
-        }
-
-        let mut node = starting_point;
-        let mut nodes = Vec::new();
-        nodes.push(node);
-
-        let mut face_degree = 1;
-
-        loop
-        {
-            for edge in &self.wakes
-            {
-                let (a, b) = (edge.theta0, edge.theta1);
-                if node.matches(a)
-                {
-                    // This handles the satellite case as well as half of the primitive cases
-                    let rel_shift = node.relative_shift(a);
-                    node = b.rotate(rel_shift);
-                    nodes.push(node);
-                }
-                else if node.matches(b)
-                {
-                    let rel_shift = node.relative_shift(b);
-                    node = a.rotate(rel_shift);
-                    nodes.push(node);
-                }
-            }
-
-            if node == starting_point
-            {
-                // Remove repeated starting vertex
-                if nodes.len() > 1
-                {
-                    nodes.pop();
-                }
-                return Some(PrimitiveFace {
-                    label: starting_point.into(),
-                    vertices: nodes,
-                    degree: face_degree,
-                });
-            }
-            self.visited_face_ids.insert(node.to_point_class());
-
-            face_degree += 1;
-        }
     }
 
     pub fn summarize(&self, indent: usize, binary: bool)

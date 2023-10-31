@@ -2,7 +2,7 @@
 
 use clap::Parser;
 
-use marked_cycles::combinatorics::MarkedCycleCombinatorics;
+use marked_cycles::combinatorics::{dynatomic, marked_cycle, Combinatorics};
 use marked_cycles::dynatomic_cover::DynatomicCover;
 use marked_cycles::marked_cycle_cover::MarkedCycleCover;
 use marked_cycles::types::Period;
@@ -66,15 +66,17 @@ macro_rules! print_row {
 
 fn print_data_table(args: &Args)
 {
-    let p2 = MarkedCycleCombinatorics::new(args.crit_period);
+    let p2: Box<dyn Combinatorics> = if args.dynatomic
+    {
+        Box::new(dynatomic::Comb::new(args.crit_period))
+    }
+    else
+    {
+        Box::new(marked_cycle::Comb::new(args.crit_period))
+    };
 
     if args.table_max_period > 0
     {
-        if args.dynatomic
-        {
-            println!("\nData table not yet implemented for dynatomic curves.");
-            return;
-        }
         print_row!("period", "vertices", "edges", "faces", "genus");
         for period in 2..=args.table_max_period
         {

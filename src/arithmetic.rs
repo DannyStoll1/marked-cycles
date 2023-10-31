@@ -1,71 +1,83 @@
-use crate::types::Period;
-use derive_more::Display;
+use crate::types::{INum, Period};
+pub use num::integer::gcd;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
-pub struct IntegerMod<const P: Period>
+pub fn divisors(n: Period) -> impl Iterator<Item = Period>
 {
-    pub rep: Period,
-}
-impl<const P: Period> IntegerMod<P>
-{
-    #[must_use]
-    pub fn new(value: Period) -> Self
-    {
-        Self { rep: value % P }
-    }
-}
-
-impl<const P: Period, T: Into<Period>> From<T> for IntegerMod<P>
-{
-    fn from(value: T) -> Self
-    {
-        Self::new(value.into())
-    }
-}
-
-impl<const P: Period> std::ops::Add for IntegerMod<P>
-{
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output
-    {
-        Self::new(self.rep + rhs.rep)
-    }
+    (1..).take_while(move |&x| x * x <= n).flat_map(move |x| {
+        if n % x == 0
+        {
+            if x * x == n
+            {
+                vec![x].into_iter()
+            }
+            else
+            {
+                vec![x, n / x].into_iter()
+            }
+        }
+        else
+        {
+            vec![].into_iter()
+        }
+    })
 }
 
-impl<const P: Period> std::ops::Sub for IntegerMod<P>
+#[must_use]
+pub fn euler_totient(n: Period) -> INum
 {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output
-    {
-        Self::new(self.rep - rhs.rep)
-    }
+    (1..=n).filter(|&x| gcd(x, n) == 1).count() as INum
 }
 
-impl<const P: Period> std::ops::Neg for IntegerMod<P>
+#[must_use]
+pub const fn moebius(n: Period) -> INum
 {
-    type Output = Self;
-    fn neg(self) -> Self::Output
+    if n == 1
     {
-        Self::new(-self.rep)
+        return 1;
     }
+    let mut result = 1;
+    let mut n = n;
+    let mut i = 2;
+    while i * i <= n
+    {
+        if n % i == 0
+        {
+            result = -result;
+            n /= i;
+            if n % i == 0
+            {
+                return 0;
+            }
+        }
+        i += 1;
+    }
+    if n > 1
+    {
+        result = -result;
+    }
+    result
 }
 
-impl<const P: Period> std::ops::MulAssign for IntegerMod<P>
+pub fn dirichlet_convolution<F, G>(f: F, g: G, n: Period) -> INum
+where
+    F: Fn(Period) -> INum,
+    G: Fn(Period) -> INum,
 {
-    fn mul_assign(&mut self, rhs: Self)
-    {
-        self.rep = (self.rep * rhs.rep) % P
-    }
+    divisors(n).map(|d| f(d) * g(n / d)).sum()
 }
 
-impl<const P: Period> std::ops::Mul for IntegerMod<P>
+pub fn filtered_dirichlet_convolution<F, G, H>(f: F, g: G, n: Period, filter_fn: H) -> INum
+where
+    F: Fn(Period) -> INum,
+    G: Fn(Period) -> INum,
+    H: FnMut(&Period) -> bool,
 {
-    type Output = Self;
+    divisors(n).filter(filter_fn).map(|d| f(d) * g(n / d)).sum()
+}
 
-    fn mul(self, rhs: Self) -> Self::Output
-    {
-        Self::new(self.rep * rhs.rep)
-    }
+pub fn moebius_inversion<F>(f: F, n: Period) -> INum
+where
+    F: Fn(Period) -> INum,
+{
+    dirichlet_convolution(moebius, f, n)
 }
