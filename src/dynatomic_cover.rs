@@ -191,41 +191,33 @@ impl DynatomicCoverBuilder
             .collect()
     }
 
-    fn primitive_faces(
-        &self,
-        vertices: &[ShiftedCycle],
-    ) -> Vec<PrimitiveFace>
+    fn primitive_faces(&self, vertices: &[ShiftedCycle]) -> Vec<PrimitiveFace>
     {
         let mut visited = HashSet::new();
         vertices
             .iter()
             .filter_map(|cyc| {
-                let face_id = cyc.to_point_class();
-                if visited.contains(&face_id)
+                if visited.contains(cyc)
                 {
                     return None;
                 }
-                visited.insert(face_id);
-
-                Some(self.traverse_face(face_id, *cyc))
+                Some(self.traverse_face(*cyc, &mut visited))
             })
             .collect()
     }
 
     fn traverse_face(
         &self,
-        face_id: AbstractPointClass,
         starting_point: ShiftedCycle,
+        visited: &mut HashSet<ShiftedCycle>,
     ) -> PrimitiveFace
     {
-        // cycle that is currently marked
+        // Cycle that is currently marked
         let mut node: ShiftedCycle = starting_point;
 
-        // angle of the current parameter
+        // Angle of the current parameter
         let mut curr_angle = IntAngle(0);
-
         let mut nodes = Vec::new();
-
         let mut face_degree = 1;
 
         while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle)
@@ -237,6 +229,7 @@ impl DynatomicCoverBuilder
                 {
                     break;
                 }
+                visited.insert(node);
                 face_degree += 1;
             }
 
@@ -252,7 +245,7 @@ impl DynatomicCoverBuilder
         }
 
         return PrimitiveFace {
-            label: face_id,
+            label: starting_point.to_point_class(),
             vertices: nodes,
             degree: face_degree,
         };

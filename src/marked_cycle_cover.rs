@@ -164,14 +164,17 @@ impl MarkedCycleCoverBuilder
                 }
                 let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
                 let dual = cycles.get(k).cloned().flatten()?;
-                visited.insert(dual);
                 let face_id = AbstractCycleClass::new_raw(cyc.rep.min(dual.rep));
-                Some(self.traverse_face(face_id))
+                Some(self.traverse_face(face_id, &mut visited))
             })
             .collect()
     }
 
-    fn traverse_face(&self, face_id: AbstractCycleClass) -> Face
+    fn traverse_face(
+        &self,
+        face_id: AbstractCycleClass,
+        visited: &mut HashSet<AbstractCycle>,
+    ) -> Face
     {
         let starting_point = face_id.into();
 
@@ -194,6 +197,7 @@ impl MarkedCycleCoverBuilder
                 {
                     break;
                 }
+                visited.insert(node);
                 face_degree += 1;
             }
 
