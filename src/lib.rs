@@ -26,22 +26,22 @@ mod tests
     #[test]
     fn genus()
     {
-        let per1 = MarkedCycleCover::new(14, 2, 1);
+        let per1 = MarkedCycleCover::new(14, 1);
 
         assert_eq!(per1.genus(), 3154);
 
-        let per2 = MarkedCycleCover::new(14, 2, 2);
+        let per2 = MarkedCycleCover::new(14, 2);
         assert_eq!(per2.genus(), 1912);
     }
 
     #[test]
     fn max_face()
     {
-        let per1 = MarkedCycleCover::new(13, 2, 1);
+        let per1 = MarkedCycleCover::new(13, 1);
 
         assert_eq!(per1.face_sizes().max().unwrap_or_default(), 58);
 
-        let per2 = MarkedCycleCover::new(13, 2, 2);
+        let per2 = MarkedCycleCover::new(13, 2);
         assert_eq!(per2.face_sizes().max().unwrap_or_default(), 52);
     }
 }

@@ -1,23 +1,23 @@
 use crate::abstract_cycles::{AbstractPoint, AbstractPointClass, ShiftedCycle};
 use crate::lamination::Lamination;
-use crate::types::{Angle, Period};
+use crate::types::{IntAngle, Period};
 use std::collections::HashSet;
 
 mod cells;
 use cells::{Edge, PrimitiveFace, SatelliteFace, Wake};
 use num::Integer;
 
-fn get_orbit(angle: Angle, max_angle: Angle, period: Period, degree: Period) -> Vec<Angle>
+fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAngle>
 {
     let mut orbit = Vec::with_capacity(period as usize);
 
     orbit.push(angle);
-    let mut theta = angle * degree % max_angle;
+    let mut theta = angle * 2 % max_angle;
 
     while theta != angle
     {
         orbit.push(theta);
-        theta = theta * degree % max_angle;
+        theta = theta * 2 % max_angle;
     }
 
     orbit
@@ -27,10 +27,9 @@ fn get_orbit(angle: Angle, max_angle: Angle, period: Period, degree: Period) -> 
 pub struct DynatomicCover
 {
     pub period: Period,
-    pub degree: Period,
     pub crit_period: Period,
-    max_angle: Angle,
-    ray_sets: Vec<(Angle, Angle)>,
+    max_angle: IntAngle,
+    ray_sets: Vec<(IntAngle, IntAngle)>,
     pub cycles_with_shifts: Vec<Option<ShiftedCycle>>,
     pub point_classes: Vec<Option<AbstractPointClass>>,
     pub vertices: Vec<ShiftedCycle>,
@@ -44,9 +43,9 @@ pub struct DynatomicCover
 impl DynatomicCover
 {
     #[must_use]
-    pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
+    pub fn new(period: Period, crit_period: Period) -> Self
     {
-        let max_angle = Angle(degree.pow(period.try_into().unwrap_or_default()) - 1);
+        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap_or_default()) - 1);
 
         let ray_sets = Vec::new();
 
@@ -55,7 +54,6 @@ impl DynatomicCover
 
         let mut curve = Self {
             period,
-            degree,
             crit_period,
             max_angle,
             ray_sets,
@@ -217,9 +215,9 @@ impl DynatomicCover
     }
 
     #[must_use]
-    pub fn orbit(&self, angle: Angle) -> Vec<Angle>
+    pub fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
     {
-        get_orbit(angle, self.max_angle, self.period, self.degree)
+        get_orbit(angle, self.max_angle, self.period)
     }
 
     fn compute_faces(&mut self)

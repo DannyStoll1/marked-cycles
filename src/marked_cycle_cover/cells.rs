@@ -111,6 +111,17 @@ impl Edge
     }
 }
 
+impl From<Wake> for Edge
+{
+    fn from(wake: Wake) -> Self
+    {
+        Self {
+            start: wake.theta0,
+            end: wake.theta1,
+        }
+    }
+}
+
 impl std::fmt::Display for Edge
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result

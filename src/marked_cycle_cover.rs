@@ -1,91 +1,81 @@
 use crate::abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint};
 use crate::lamination::Lamination;
-use crate::types::{Angle, Period};
-use std::collections::HashSet;
+use crate::types::{IntAngle, Period};
+use std::collections::{HashMap, HashSet};
 
 mod cells;
-use cells::{Edge, Face, Wake};
+use cells::{Edge, Face};
 
-fn get_orbit(angle: Angle, max_angle: Angle, period: Period, degree: Period) -> Vec<Angle>
+fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAngle>
 {
     let mut orbit = Vec::with_capacity(period as usize);
 
     orbit.push(angle);
-    let mut theta = angle * degree % max_angle;
+    let mut theta = angle * 2 % max_angle;
 
     while theta != angle
     {
         orbit.push(theta);
-        theta = theta * degree % max_angle;
+        theta = theta * 2 % max_angle;
     }
 
     orbit
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MarkedCycleCover
+pub struct MarkedCycleCoverBuilder
 {
     pub period: Period,
-    pub degree: Period,
     pub crit_period: Period,
-    max_angle: Angle,
-    ray_sets: Vec<(Angle, Angle)>,
-    pub cycles: Vec<Option<AbstractCycle>>,
-    pub vertices: Vec<AbstractCycle>,
-    pub wakes: Vec<Wake>,
-    pub edges: Vec<Edge>,
-    pub faces: Vec<Face>,
-    visited_face_ids: HashSet<AbstractCycleClass>,
+    max_angle: IntAngle,
+    adjacency_map: HashMap<AbstractCycle, Vec<(AbstractCycle, IntAngle)>>,
 }
 
-impl MarkedCycleCover
+impl MarkedCycleCoverBuilder
 {
-    #[must_use] pub fn new(period: Period, degree: Period, crit_period: Period) -> Self
+    #[must_use]
+    pub fn new(period: Period, crit_period: Period) -> Self
     {
-        let max_angle = Angle(degree.pow(period.try_into().unwrap()) - 1);
+        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap()) - 1);
 
-        let ray_sets = Vec::new();
-
-        let cycles_with_shifts = vec![None; max_angle.try_into().unwrap()];
-
-        let mut curve = Self {
+        Self {
             period,
-            degree,
             crit_period,
             max_angle,
-            ray_sets,
-            cycles: cycles_with_shifts,
-            vertices: Vec::new(),
-            wakes: Vec::new(),
-            edges: Vec::new(),
-            faces: Vec::new(),
-            visited_face_ids: HashSet::new(),
-        };
-        curve.run();
-        curve
+            adjacency_map: HashMap::new(),
+        }
     }
 
-    fn compute_ray_sets(&mut self)
+    #[must_use]
+    pub fn build(&mut self) -> MarkedCycleCover
     {
-        Lamination::new()
-            .with_crit_period(self.crit_period)
-            .arcs_of_period(self.period)
-            .iter()
-            .for_each(|(theta0, theta1)| {
-                self.ray_sets.push((
-                    (self.max_angle.scale_by_ratio(theta0)).into(),
-                    (self.max_angle.scale_by_ratio(theta1)).into(),
-                ));
-            });
-        self.ray_sets.sort();
+        let cycles = self.cycles();
+        let vertices = self.vertices(&cycles);
+        let edges = self.edges(&cycles);
+        let faces = self.faces(&cycles, &vertices);
+
+        MarkedCycleCover {
+            period: self.period,
+            crit_period: self.crit_period,
+            vertices,
+            edges,
+            faces,
+        }
     }
 
-    fn compute_cycles(&mut self)
+    #[inline]
+    fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
     {
+        get_orbit(angle, self.max_angle, self.period)
+    }
+
+    fn cycles(&self) -> Vec<Option<AbstractCycle>>
+    {
+        let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
         for theta in 0..self.max_angle.into()
         {
             let theta_usize = usize::try_from(theta).unwrap();
-            if self.cycles[theta_usize].is_some()
+            if cycles[theta_usize].is_some()
             {
                 continue;
             }
@@ -101,77 +91,188 @@ impl MarkedCycleCover
                     .map(|x| usize::try_from(*x).unwrap())
                     .for_each(|x| {
                         let cycle = AbstractCycle { rep: cycle_rep };
-                        self.cycles[x] = Some(cycle);
+                        cycles[x] = Some(cycle);
                     });
             }
         }
+        if self.period == 1
+        {
+            let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
+            cycles.push(Some(AbstractCycle { rep: alpha_fp }));
+        }
+        cycles
     }
 
-    fn compute_vertices(&mut self)
+    fn vertices(&self, cycles: &[Option<AbstractCycle>]) -> Vec<AbstractCycle>
     {
         // Vertices, labeled by abstract point
-        self.vertices = self.cycles.iter().filter_map(|&v| v).collect::<Vec<_>>();
-        self.vertices.sort_unstable_by_key(|x| x.rep);
-        self.vertices.dedup();
+        let mut vertices = cycles.iter().filter_map(|&v| v).collect::<Vec<_>>();
+        vertices.sort_unstable_by_key(|x| x.rep);
+        vertices.dedup();
+        vertices
     }
 
-    fn compute_edges(&mut self)
+    fn edges(&mut self, cycles: &[Option<AbstractCycle>]) -> Vec<Edge>
     {
-        // Leaves of lamination, labeled by shifted cycle
-        self.wakes = self
-            .ray_sets
-            .iter()
-            .map(|(theta0, theta1)| {
-                let cycle0 = self.cycles[usize::try_from(*theta0).unwrap()].unwrap();
-                let cycle1 = self.cycles[usize::try_from(*theta1).unwrap()].unwrap();
-                Wake {
-                    theta0: cycle0,
-                    theta1: cycle1,
-                }
-            })
-            .collect();
+        Lamination::new()
+            .with_crit_period(self.crit_period)
+            .into_arcs_of_period(self.period)
+            .into_iter()
+            .filter_map(|(theta0, theta1)| {
+                let angle0 = self.max_angle.scale_by_ratio(&theta0);
+                let angle1 = self.max_angle.scale_by_ratio(&theta1);
 
-        self.edges = self
-            .wakes
-            .iter()
-            .filter(|x| !x.is_satellite())
-            .map(|w| Edge {
-                start: w.theta0,
-                end: w.theta1,
+                let k0 = usize::try_from(angle0).ok()?;
+                let k1 = usize::try_from(angle1).ok()?;
+
+                let cyc0 = cycles[k0]?;
+                let cyc1 = cycles[k1]?;
+
+                if cyc0 == cyc1
+                {
+                    return None;
+                }
+
+                let tag = angle0.max(angle1);
+                self.adjacency_map
+                    .entry(cyc0)
+                    .or_insert_with(Vec::new)
+                    .push((cyc1, tag));
+                self.adjacency_map
+                    .entry(cyc1)
+                    .or_insert_with(Vec::new)
+                    .push((cyc0, tag));
+
+                Some(Edge {
+                    start: cyc0,
+                    end: cyc1,
+                })
             })
             .collect()
     }
 
-    pub fn run(&mut self)
+    fn faces(&self, cycles: &[Option<AbstractCycle>], vertices: &[AbstractCycle]) -> Vec<Face>
     {
-        self.compute_ray_sets();
-        self.compute_cycles();
-        self.compute_vertices();
-        self.compute_edges();
-        self.compute_faces();
+        let mut visited = HashSet::new();
+        vertices
+            .iter()
+            .cloned()
+            .filter_map(|cyc| {
+                if visited.contains(&cyc)
+                {
+                    return None;
+                }
+                let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
+                let dual = cycles.get(k).cloned().flatten()?;
+                visited.insert(dual);
+                let face_id = AbstractCycleClass::new_raw(cyc.rep.min(dual.rep));
+                Some(self.traverse_face(face_id))
+            })
+            .collect()
     }
 
-    #[must_use] pub fn euler_characteristic(&self) -> isize
+    fn traverse_face(&self, face_id: AbstractCycleClass) -> Face
+    {
+        let starting_point = face_id.into();
+
+        // cycle that is currently marked
+        let mut node: AbstractCycle = starting_point;
+
+        // angle of the current parameter
+        let mut curr_angle = IntAngle(0);
+
+        let mut nodes = Vec::new();
+
+        let mut face_degree = 1;
+
+        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle)
+        {
+            // If we are crossing the real axis
+            if curr_angle >= next_angle
+            {
+                if node.rep.angle == starting_point.rep.angle
+                {
+                    break;
+                }
+                face_degree += 1;
+            }
+
+            nodes.push(node);
+            node = next_node;
+
+            curr_angle = next_angle;
+        }
+
+        if nodes.is_empty()
+        {
+            nodes.push(node);
+        }
+
+        return Face {
+            label: face_id,
+            vertices: nodes,
+            degree: face_degree,
+        };
+    }
+
+    fn get_next_vertex_and_angle(
+        &self,
+        node: AbstractCycle,
+        curr_angle: IntAngle,
+    ) -> Option<(AbstractCycle, IntAngle)>
+    {
+        self.adjacency_map
+            .get(&node)?
+            .iter()
+            .min_by_key(|(_, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(self.max_angle.0))
+            .cloned()
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MarkedCycleCover
+{
+    pub period: Period,
+    pub crit_period: Period,
+    pub vertices: Vec<AbstractCycle>,
+    pub edges: Vec<Edge>,
+    pub faces: Vec<Face>,
+}
+
+impl MarkedCycleCover
+{
+    #[must_use]
+    pub fn new(period: Period, crit_period: Period) -> Self
+    {
+        MarkedCycleCoverBuilder::new(period, crit_period).build()
+    }
+
+    #[must_use]
+    pub fn euler_characteristic(&self) -> isize
     {
         self.num_vertices() as isize - self.num_edges() as isize + self.num_faces() as isize
     }
 
-    #[must_use] pub fn num_vertices(&self) -> usize
+    #[must_use]
+    pub fn num_vertices(&self) -> usize
     {
         self.vertices.len()
     }
 
-    #[must_use] pub fn num_edges(&self) -> usize
+    #[must_use]
+    pub fn num_edges(&self) -> usize
     {
         self.edges.len()
     }
 
-    #[must_use] pub fn num_faces(&self) -> usize
+    #[must_use]
+    pub fn num_faces(&self) -> usize
     {
         self.faces.len()
     }
 
-    #[must_use] pub fn genus(&self) -> isize
+    #[must_use]
+    pub fn genus(&self) -> isize
     {
         1 - self.euler_characteristic() / 2
     }
@@ -181,78 +282,10 @@ impl MarkedCycleCover
         self.faces.iter().map(Face::len)
     }
 
-    #[must_use] pub fn num_odd_faces(&self) -> usize
+    #[must_use]
+    pub fn num_odd_faces(&self) -> usize
     {
         self.face_sizes().filter(|&s| s % 2 == 1).count()
-    }
-
-    #[must_use] pub fn orbit(&self, angle: Angle) -> Vec<Angle>
-    {
-        get_orbit(angle, self.max_angle, self.period, self.degree)
-    }
-
-    fn compute_faces(&mut self)
-    {
-        let mut visited = HashSet::new();
-        self.faces = self
-            .vertices
-            .iter()
-            .cloned()
-            .filter_map(|cyc| {
-                if visited.contains(&cyc) {
-                    return None
-                }
-                let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
-                let dual = self.cycles[k]?;
-                visited.insert(dual);
-                let face_id = AbstractCycleClass::new_raw(cyc.rep.min(dual.rep));
-                Some(self.traverse_face(face_id))
-            })
-            .collect();
-    }
-
-    fn traverse_face(&self, face_id: AbstractCycleClass) -> Face
-    {
-
-        let starting_point = face_id.into();
-        let mut node = starting_point;
-        let mut nodes = Vec::new();
-        nodes.push(node);
-
-        let mut face_degree = 1;
-
-        loop
-        {
-            for Edge { start: theta0, end: theta1 } in &self.edges
-            {
-                if node == *theta0
-                {
-                    node = *theta1;
-                    nodes.push(node);
-                }
-                else if node == *theta1
-                {
-                    node = *theta0;
-                    nodes.push(node);
-                }
-            }
-
-            if node == starting_point
-            {
-                // Remove repeated starting vertex
-                if nodes.len() > 1
-                {
-                    nodes.pop();
-                }
-                return Face {
-                    label: starting_point.into(),
-                    vertices: nodes,
-                    degree: face_degree,
-                };
-            }
-
-            face_degree += 1;
-        }
     }
 
     pub fn summarize(&self, indent: usize, binary: bool)

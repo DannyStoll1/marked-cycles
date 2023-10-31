@@ -47,12 +47,12 @@ fn print_combinatorics(args: &Args)
 
         if args.dynatomic
         {
-            let cov = DynatomicCover::new(args.marked_period, 2, args.crit_period);
+            let cov = DynatomicCover::new(args.marked_period, args.crit_period);
             cov.summarize(args.indent, args.binary);
         }
         else
         {
-            let cov = MarkedCycleCover::new(args.marked_period, 2, args.crit_period);
+            let cov = MarkedCycleCover::new(args.marked_period, args.crit_period);
             cov.summarize(args.indent, args.binary);
         }
     }

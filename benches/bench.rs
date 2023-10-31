@@ -17,6 +17,6 @@ fn lamination(b: &mut Bencher)
 fn mc_curve(b: &mut Bencher)
 {
     b.iter(|| {
-        let _curve = MarkedCycleCover::new(16, 2, 1);
+        let _curve = MarkedCycleCover::new(16, 1);
     });
 }

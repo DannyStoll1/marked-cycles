@@ -117,7 +117,7 @@ impl Lamination
     {
         let endpoints = vec![Endpoint::default()];
 
-        let arcs = vec![Vec::new(), vec![(RatAngle::new(0, 1), RatAngle::new(0, 1))]];
+        let arcs = vec![Vec::new(), vec![(RatAngle::new(0, 1), RatAngle::new(1, 1))]];
 
         Self {
             crit_period: 1,

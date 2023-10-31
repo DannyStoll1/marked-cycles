@@ -1,19 +1,19 @@
-use crate::types::{Angle, Period};
+use crate::types::{IntAngle, Period};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AbstractPoint
 {
-    pub angle: Angle,
+    pub angle: IntAngle,
     pub period: Period,
-    max_angle: Angle,
+    max_angle: IntAngle,
 }
 
 impl AbstractPoint
 {
     #[must_use]
-    pub const fn new(angle: Angle, period: Period) -> Self
+    pub const fn new(angle: IntAngle, period: Period) -> Self
     {
-        let max_angle = Angle((1 << period) - 1);
+        let max_angle = IntAngle((1 << period) - 1);
         Self {
             angle,
             period,
@@ -22,7 +22,7 @@ impl AbstractPoint
     }
 
     #[must_use]
-    pub const fn with_angle(&self, angle: Angle) -> Self
+    pub const fn with_angle(&self, angle: IntAngle) -> Self
     {
         Self {
             angle,

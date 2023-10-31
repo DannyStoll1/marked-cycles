@@ -31,9 +31,9 @@ pub type RatAngle = Rational64;
     Binary,
     Display,
 )]
-pub struct Angle(pub Period);
+pub struct IntAngle(pub Period);
 
-impl Angle
+impl IntAngle
 {
     pub fn scale_by_ratio(&self, ratio: &Rational64) -> Self
     {
@@ -42,7 +42,7 @@ impl Angle
     }
 }
 
-impl std::ops::Shl<Period> for Angle
+impl std::ops::Shl<Period> for IntAngle
 {
     type Output = Self;
     fn shl(self, rhs: Period) -> Self::Output
@@ -51,7 +51,7 @@ impl std::ops::Shl<Period> for Angle
     }
 }
 
-impl std::ops::Shr<Period> for Angle
+impl std::ops::Shr<Period> for IntAngle
 {
     type Output = Self;
     fn shr(self, rhs: Period) -> Self::Output
@@ -60,7 +60,7 @@ impl std::ops::Shr<Period> for Angle
     }
 }
 
-impl std::ops::Rem for Angle
+impl std::ops::Rem for IntAngle
 {
     type Output = Self;
     fn rem(self, rhs: Self) -> Self::Output
@@ -69,10 +69,10 @@ impl std::ops::Rem for Angle
     }
 }
 
-impl TryFrom<Angle> for usize
+impl TryFrom<IntAngle> for usize
 {
     type Error = TryFromIntError;
-    fn try_from(value: Angle) -> Result<Self, Self::Error>
+    fn try_from(value: IntAngle) -> Result<Self, Self::Error>
     {
         value.0.try_into()
     }

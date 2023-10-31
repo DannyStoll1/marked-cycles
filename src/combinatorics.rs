@@ -111,7 +111,7 @@ impl MarkedCycleCombinatorics
         let crit_per = self.crit_period;
         self.curves
             .entry(n)
-            .or_insert_with(|| MarkedCycleCover::new(n, 2, crit_per))
+            .or_insert_with(|| MarkedCycleCover::new(n, crit_per))
     }
 
     // pub fn _compute_curve(&self, n: Period) -> MarkedMultCover {
