@@ -1,11 +1,11 @@
-use crate::types::{IntAngle, Period};
+use crate::types::{IntAngle, KneadingSequence, Period};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AbstractPoint
 {
     pub angle: IntAngle,
     pub period: Period,
-    max_angle: IntAngle,
+    pub(crate) max_angle: IntAngle,
 }
 
 impl AbstractPoint
@@ -22,7 +22,7 @@ impl AbstractPoint
     }
 
     #[must_use]
-    pub const fn with_angle(&self, angle: IntAngle) -> Self
+    pub const fn with_angle(self, angle: IntAngle) -> Self
     {
         Self {
             angle,
@@ -55,6 +55,53 @@ impl AbstractPoint
     pub fn bit_flip(&self) -> Self
     {
         self.with_angle(self.max_angle & !self.angle)
+    }
+
+    #[must_use]
+    pub fn orbit_min_and_kneading_sequence(&self) -> (Self, KneadingSequence)
+    {
+        let mut ks = KneadingSequence::default();
+        let mut theta = self.angle;
+        let mut min_theta = theta;
+
+        let u0 = self.angle / 2;
+        let u1 = (self.max_angle + self.angle) / 2;
+
+        loop {
+            if theta <= u0 || theta > u1 {
+                ks.increment();
+            }
+            theta = (theta * 2) % self.max_angle;
+
+            if theta == self.angle {
+                break;
+            }
+
+            ks.shift();
+            min_theta = min_theta.min(theta);
+        }
+
+        (self.with_angle(min_theta), ks)
+    }
+
+    #[must_use]
+    pub fn kneading_sequence(&self) -> KneadingSequence
+    {
+        println!("Computing kneading sequence");
+        let mut ks = KneadingSequence::default();
+        let mut theta = self.angle;
+
+        let u0 = self.angle / 2;
+        let u1 = (self.max_angle + self.angle) / 2;
+
+        for _ in 0..self.period {
+            ks.shift();
+            if theta <= u0 || theta > u1 {
+                ks.increment();
+            }
+            theta = (theta * 2) % self.max_angle;
+        }
+        ks
     }
 }
 
@@ -158,7 +205,11 @@ impl std::fmt::Display for AbstractCycle
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "({})", self.rep.angle)
+        if let Some(width) = f.width() {
+            write!(f, "({:>width$})", self.rep.angle)
+        } else {
+            write!(f, "({})", self.rep.angle)
+        }
     }
 }
 

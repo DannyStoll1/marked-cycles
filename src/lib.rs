@@ -13,8 +13,12 @@ const MAX_DISPLAY_ITEMS: usize = 100;
 #[cfg(test)]
 mod tests
 {
+    use crate::abstract_cycles::AbstractPoint;
+    use crate::combinatorics::{marked_cycle, Combinatorics, dynatomic};
+    use crate::dynatomic_cover::DynatomicCover;
     use crate::lamination::Lamination;
     use crate::marked_cycle_cover::MarkedCycleCover;
+    use crate::types::IntAngle;
 
     #[test]
     fn lamination()
@@ -29,12 +33,86 @@ mod tests
     #[test]
     fn genus()
     {
-        let per1 = MarkedCycleCover::new(14, 1);
+        let start = 3;
+        let end = 15;
 
-        assert_eq!(per1.genus(), 3154);
+        for crit_period in [1, 2] {
+            for period in start..end {
+                let per1 = MarkedCycleCover::new(period, 1);
+                let comb = marked_cycle::Comb::new(1);
+                assert_eq!(
+                    per1.genus(),
+                    comb.genus(period),
+                    "Testing MC_{period}(Per_{crit_period})"
+                );
+            }
 
-        let per2 = MarkedCycleCover::new(14, 2);
-        assert_eq!(per2.genus(), 1912);
+            for period in start..end {
+                let per2 = MarkedCycleCover::new(period, 2);
+                let comb = marked_cycle::Comb::new(2);
+                assert_eq!(
+                    per2.genus(),
+                    comb.genus(period),
+                    "Testing MC_{period}(Per_{crit_period})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn genus_dynatomic()
+    {
+        let start = 3;
+        let end = 15;
+
+        for crit_period in [1, 2] {
+            for period in start..end {
+                let per1 = DynatomicCover::new(period, 1);
+                let comb = dynatomic::Comb::new(1);
+                assert_eq!(
+                    per1.genus(),
+                    comb.genus(period),
+                    "Testing Dyn_{period}(Per_{crit_period})"
+                );
+            }
+
+            for period in start..end {
+                let per2 = DynatomicCover::new(period, 2);
+                let comb = dynatomic::Comb::new(2);
+                assert_eq!(
+                    per2.genus(),
+                    comb.genus(period),
+                    "Testing Dyn_{period}(Per_{crit_period})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn num_faces()
+    {
+        let start = 3;
+        let end = 15;
+
+        for period in start..end {
+            let per1 = MarkedCycleCover::new(period, 1);
+            let comb = marked_cycle::Comb::new(1);
+            assert_eq!(
+                per1.num_faces() as i64,
+                comb.faces(period),
+                "Testing per1 in period {period}"
+            );
+        }
+
+        for period in start..end {
+            let per2 = MarkedCycleCover::new(period, 2);
+            let comb = marked_cycle::Comb::new(2);
+            assert_eq!(
+                per2.num_faces() as i64,
+                comb.faces(period),
+                "Testing per2 in period {period}"
+            );
+        }
     }
 
     #[test]
@@ -46,5 +124,16 @@ mod tests
 
         let per2 = MarkedCycleCover::new(13, 2);
         assert_eq!(per2.face_sizes().max().unwrap_or_default(), 52);
+    }
+
+    #[test]
+    fn kneading_sequence()
+    {
+        let point = AbstractPoint::new(IntAngle(13), 6);
+        let ks = point.kneading_sequence();
+        assert_eq!(format!("{:6}", ks), "00110*");
+
+        let (_, ks) = point.orbit_min_and_kneading_sequence();
+        assert_eq!(format!("{:6}", ks), "00110*");
     }
 }

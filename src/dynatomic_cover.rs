@@ -1,4 +1,4 @@
-use crate::abstract_cycles::{AbstractPoint, AbstractPointClass, ShiftedCycle};
+use crate::abstract_cycles::{AbstractPoint, ShiftedCycle};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
 use std::collections::{HashMap, HashSet};
@@ -275,9 +275,9 @@ impl DynatomicCover
     }
 
     #[must_use]
-    pub fn euler_characteristic(&self) -> isize
+    pub fn euler_characteristic(&self) -> i64
     {
-        self.num_vertices() as isize - self.num_edges() as isize + self.num_faces() as isize
+        self.num_vertices() as i64 - self.num_edges() as i64 + self.num_faces() as i64
     }
 
     #[must_use]
@@ -299,7 +299,7 @@ impl DynatomicCover
     }
 
     #[must_use]
-    pub fn genus(&self) -> isize
+    pub fn genus(&self) -> i64
     {
         1 - self.euler_characteristic() / 2
     }

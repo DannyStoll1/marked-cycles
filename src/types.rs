@@ -77,3 +77,30 @@ impl TryFrom<IntAngle> for usize
         value.0.try_into()
     }
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct KneadingSequence
+{
+    itinerary: i64,
+}
+
+impl KneadingSequence {
+    #[inline]
+    pub fn increment(&mut self) {
+        self.itinerary += 1;
+    }
+
+    #[inline]
+    pub fn shift(&mut self) {
+        self.itinerary <<= 1;
+    }
+}
+
+impl std::fmt::Display for KneadingSequence
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        let width = f.width().unwrap_or(17);
+        write!(f, "{:0>width$b}*", self.itinerary >> 1, width = width - 1)
+    }
+}

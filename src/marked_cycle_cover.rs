@@ -6,6 +6,8 @@ use std::collections::{HashMap, HashSet};
 mod cells;
 use cells::{Edge, Face};
 
+use self::cells::Wake;
+
 fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAngle>
 {
     let mut orbit = Vec::with_capacity(period as usize);
@@ -140,6 +142,7 @@ impl MarkedCycleCoverBuilder
                 Some(Edge {
                     start: cyc0,
                     end: cyc1,
+                    wake: Wake { angle0, angle1 },
                 })
             })
             .collect()
@@ -241,9 +244,9 @@ impl MarkedCycleCover
     }
 
     #[must_use]
-    pub fn euler_characteristic(&self) -> isize
+    pub fn euler_characteristic(&self) -> i64
     {
-        self.num_vertices() as isize - self.num_edges() as isize + self.num_faces() as isize
+        self.num_vertices() as i64 - self.num_edges() as i64 + self.num_faces() as i64
     }
 
     #[must_use]
@@ -265,7 +268,7 @@ impl MarkedCycleCover
     }
 
     #[must_use]
-    pub fn genus(&self) -> isize
+    pub fn genus(&self) -> i64
     {
         1 - self.euler_characteristic() / 2
     }

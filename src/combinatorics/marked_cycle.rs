@@ -51,7 +51,7 @@ impl Comb
         curve.num_faces()
     }
 
-    pub fn cover_genus(&mut self, n: Period) -> isize
+    pub fn cover_genus(&mut self, n: Period) -> i64
     {
         let curve = self.curve(n);
         curve.genus()

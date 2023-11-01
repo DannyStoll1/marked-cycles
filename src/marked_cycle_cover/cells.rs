@@ -1,6 +1,6 @@
 use crate::{
-    abstract_cycles::{AbstractCycle, AbstractCycleClass},
-    types::Period,
+    abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint},
+    types::{IntAngle, Period},
 };
 
 #[derive(Debug, PartialEq)]
@@ -65,20 +65,15 @@ impl std::fmt::Binary for Face
 #[derive(Debug, PartialEq)]
 pub struct Wake
 {
-    pub theta0: AbstractCycle,
-    pub theta1: AbstractCycle,
+    pub angle0: IntAngle,
+    pub angle1: IntAngle,
 }
 
 impl Wake
 {
-    pub fn is_real(&self) -> bool
-    {
-        self.theta0.compute_cycle_class() == self.theta1.compute_cycle_class()
-    }
-
     pub fn is_satellite(&self) -> bool
     {
-        self.theta0 == self.theta1
+        self.angle0 == self.angle1
     }
 }
 
@@ -86,7 +81,23 @@ impl std::fmt::Display for Wake
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "Wake({}, {})", self.theta0, self.theta1,)
+        if let Some(width) = f.width() {
+            write!(f, "{:>width$} <-> {:<width$}", self.angle0, self.angle1)
+        } else {
+            write!(f, "{} <-> {}", self.angle0, self.angle1)
+        }
+    }
+}
+
+impl std::fmt::Binary for Wake
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        if let Some(width) = f.width() {
+            write!(f, "{:>width$b} <-> {:<width$b}", self.angle0, self.angle1)
+        } else {
+            write!(f, "{:b} <-> {:b}", self.angle0, self.angle1)
+        }
     }
 }
 
@@ -95,6 +106,7 @@ pub struct Edge
 {
     pub start: AbstractCycle,
     pub end: AbstractCycle,
+    pub wake: Wake,
 }
 
 impl Edge
@@ -110,22 +122,20 @@ impl Edge
     }
 }
 
-impl From<Wake> for Edge
-{
-    fn from(wake: Wake) -> Self
-    {
-        Self {
-            start: wake.theta0,
-            end: wake.theta1,
-        }
-    }
-}
-
 impl std::fmt::Display for Edge
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "{} -- {}", self.start, self.end)
+        let ks = AbstractPoint::new(self.wake.angle0, self.start.rep.period).kneading_sequence();
+        write!(
+            f,
+            "{:>digits$} -- {:<digits$}   wake = {:digits$}   KS = {ks:>period$}",
+            self.start,
+            self.end,
+            self.wake,
+            digits = (self.start.rep.period / 3) as usize,
+            period = self.start.rep.period as usize
+        )
     }
 }
 
@@ -133,6 +143,14 @@ impl std::fmt::Binary for Edge
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "{:b} -- {:b}", self.start, self.end)
+        let ks = AbstractPoint::new(self.wake.angle0, self.start.rep.period).kneading_sequence();
+        write!(
+            f,
+            "{:b} -- {:b}   wake = {wake:b}   KS = {ks:>period$}",
+            self.start,
+            self.end,
+            wake = self.wake,
+            period = self.start.rep.period as usize
+        )
     }
 }
