@@ -53,7 +53,7 @@ impl MarkedCycleCoverBuilder
         let cycles = self.cycles();
         let vertices = self.vertices(&cycles);
         let edges = self.edges(&cycles);
-        let faces = self.faces(&cycles, &vertices);
+        let faces = self.faces(&vertices);
 
         MarkedCycleCover {
             period: self.period,
@@ -148,7 +148,7 @@ impl MarkedCycleCoverBuilder
             .collect()
     }
 
-    fn faces(&self, cycles: &[Option<AbstractCycle>], vertices: &[AbstractCycle]) -> Vec<Face>
+    fn faces(&self, vertices: &[AbstractCycle]) -> Vec<Face>
     {
         let mut visited = HashSet::new();
         vertices
@@ -158,22 +158,17 @@ impl MarkedCycleCoverBuilder
                 if visited.contains(&cyc) {
                     return None;
                 }
-                let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
-                let dual = cycles.get(k).cloned().flatten()?;
-                let face_id = AbstractCycleClass::new_raw(cyc.rep.min(dual.rep));
-                Some(self.traverse_face(face_id, &mut visited))
+                Some(self.traverse_face(cyc, &mut visited))
             })
             .collect()
     }
 
     fn traverse_face(
         &self,
-        face_id: AbstractCycleClass,
+        starting_point: AbstractCycle,
         visited: &mut HashSet<AbstractCycle>,
     ) -> Face
     {
-        let starting_point = face_id.into();
-
         // cycle that is currently marked
         let mut node: AbstractCycle = starting_point;
 
@@ -187,7 +182,7 @@ impl MarkedCycleCoverBuilder
         while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle) {
             // If we are crossing the real axis
             if curr_angle >= next_angle {
-                if node.rep.angle == starting_point.rep.angle {
+                if node == starting_point {
                     break;
                 }
                 visited.insert(node);
@@ -203,6 +198,8 @@ impl MarkedCycleCoverBuilder
         if nodes.is_empty() {
             nodes.push(node);
         }
+
+        let face_id = AbstractCycleClass::new(starting_point);
 
         return Face {
             label: face_id,

@@ -217,7 +217,7 @@ impl DynatomicCoverBuilder
         while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle) {
             // If we are crossing the real axis
             if curr_angle >= next_angle {
-                if node.rep.angle == starting_point.rep.angle {
+                if node == starting_point {
                     break;
                 }
                 visited.insert(node);

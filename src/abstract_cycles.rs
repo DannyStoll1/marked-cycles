@@ -1,6 +1,6 @@
 use crate::types::{IntAngle, KneadingSequence, Period};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct AbstractPoint
 {
     pub angle: IntAngle,
@@ -104,6 +104,15 @@ impl AbstractPoint
         ks
     }
 }
+
+impl PartialEq for AbstractPoint
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.angle == other.angle
+    }
+}
+impl Eq for AbstractPoint {}
 
 impl PartialOrd for AbstractPoint
 {
@@ -236,13 +245,19 @@ pub struct AbstractCycleClass
 }
 impl AbstractCycleClass
 {
+    // Works for Per(1) but not Per(2)
+    // #[must_use]
+    // pub fn new_compute(cycle: AbstractCycle) -> Self
+    // {
+    //     let dual_rep = cycle.rep.bit_flip().orbit_min();
+    //     Self {
+    //         rep: cycle.rep.min(dual_rep),
+    //     }
+    // }
     #[must_use]
-    pub fn new_compute(cycle: AbstractCycle) -> Self
+    pub fn new(cycle: AbstractCycle) -> Self
     {
-        let dual_rep = cycle.rep.bit_flip().orbit_min();
-        Self {
-            rep: cycle.rep.min(dual_rep),
-        }
+        Self { rep: cycle.rep }
     }
 
     #[must_use]
@@ -255,7 +270,7 @@ impl From<AbstractCycle> for AbstractCycleClass
 {
     fn from(cycle: AbstractCycle) -> Self
     {
-        Self::new_compute(cycle)
+        Self::new(cycle)
     }
 }
 impl From<AbstractCycleClass> for AbstractCycle
