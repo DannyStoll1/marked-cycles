@@ -76,8 +76,7 @@ impl Combinatorics for Comb
         // Number of points of period dividing n
         // under z -> z^(+/- 2)
         let v = n.try_into().unwrap_or(0);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => pow(2, v) - 1,
             2 => pow(2, v) - pow(-1, v),
             _ => 0,
@@ -103,8 +102,7 @@ impl Combinatorics for Comb
     {
         // Number of mateable hyperbolic components of period dividing n
         let v = n.try_into().unwrap_or(0);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => pow(2, v) / 2,
             2 => (pow(2, v) - pow(-1, v)) / 3,
             _ => 0,
@@ -136,8 +134,7 @@ impl Combinatorics for Comb
     {
         let symmetry_order = self.crit_period + 1;
 
-        if n % symmetry_order > 0
-        {
+        if n % symmetry_order > 0 {
             return 0;
         }
 
@@ -182,8 +179,7 @@ impl Combinatorics for Comb
         let hyp = self.hyperbolic_components(n);
         let per = self.periodic_points(n);
         let satf = self.satellite_faces(n);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => 1 + (n * hyp - 3 * per / 2 - satf) / 2,
             2 => 1 - 2 * per / 3 + (n * hyp - satf) / 2,
             _ => 0,

@@ -37,8 +37,7 @@ impl AbstractPoint
         let mut theta = self.angle;
         let mut min_theta = theta;
 
-        while theta != self.angle
-        {
+        while theta != self.angle {
             theta = (theta * 2) % self.max_angle;
             min_theta = min_theta.min(theta);
         }
@@ -170,6 +169,15 @@ impl std::fmt::Binary for AbstractCycle
         write!(f, "({:0n$b})", self.rep.angle, n = self.rep.period as usize)
     }
 }
+
+impl From<AbstractCycle> for IntAngle
+{
+    fn from(cyc: AbstractCycle) -> Self
+    {
+        cyc.rep.angle
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AbstractCycleClass
 {

@@ -151,28 +151,20 @@ impl Lamination
         let mut new_endpoints = Vec::new();
         let mut endpoint_it = self.endpoints.iter().skip(1).peekable();
 
-        'outer: for k in (1..n).filter(|k| self.crit_period == 1 || k * 3 < n || k * 3 > 2 * n)
-        {
+        'outer: for k in (1..n).filter(|k| self.crit_period == 1 || k * 3 < n || k * 3 > 2 * n) {
             let theta = CachedRatAngle::from(RatAngle::new(k, n));
 
-            'inner: while let Some(&curr) = endpoint_it.peek()
-            {
-                match curr.angle.partial_cmp(&theta)
-                {
-                    Some(Ordering::Less) =>
-                    {
-                        if curr.left
-                        {
+            'inner: while let Some(&curr) = endpoint_it.peek() {
+                match curr.angle.partial_cmp(&theta) {
+                    Some(Ordering::Less) => {
+                        if curr.left {
                             stack.push(0);
-                        }
-                        else
-                        {
+                        } else {
                             let top = stack.pop();
                             debug_assert_eq!(top, Some(0));
                         }
                     }
-                    Some(Ordering::Equal) =>
-                    {
+                    Some(Ordering::Equal) => {
                         endpoint_it.next();
                         continue 'outer;
                     }
@@ -185,17 +177,14 @@ impl Lamination
                 endpoint_it.next();
             }
 
-            match stack.last()
-            {
-                Some(&j) if j != 0 =>
-                {
+            match stack.last() {
+                Some(&j) if j != 0 => {
                     let other = CachedRatAngle::new(j, n);
                     new_endpoints.push(Endpoint::left(other, theta));
                     new_endpoints.push(Endpoint::right(theta, other));
                     stack.pop();
                 }
-                _ =>
-                {
+                _ => {
                     stack.push(k);
                 }
             }
@@ -226,8 +215,7 @@ impl Lamination
 
     pub fn extend_to_period(&mut self, period: Period)
     {
-        for _ in self.max_period..(period as Period)
-        {
+        for _ in self.max_period..(period as Period) {
             self.extend();
         }
     }
@@ -236,8 +224,7 @@ impl Lamination
     pub fn arcs_of_period(&mut self, per: Period) -> &Vec<(RatAngle, RatAngle)>
     {
         self.extend_to_period(per);
-        if per <= 0
-        {
+        if per <= 0 {
             return &self.arcs[0];
         }
 
@@ -248,8 +235,7 @@ impl Lamination
     pub fn into_arcs_of_period(mut self, per: Period) -> Vec<(RatAngle, RatAngle)>
     {
         self.extend_to_period(per);
-        if per <= 0
-        {
+        if per <= 0 {
             return std::mem::take(&mut self.arcs[0]);
         }
 
@@ -284,8 +270,7 @@ fn main()
 {
     let mut lamination = Lamination::new();
     let arcs = lamination.arcs_of_period(9);
-    for (a, b) in arcs
-    {
+    for (a, b) in arcs {
         println!(
             "{:>3}/{:<3} <--> {:>3}/{:<3}",
             a.numer(),

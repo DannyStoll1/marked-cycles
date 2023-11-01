@@ -8,6 +8,8 @@ pub mod lamination;
 pub mod marked_cycle_cover;
 pub mod types;
 
+const MAX_DISPLAY_ITEMS: usize = 100;
+
 #[cfg(test)]
 mod tests
 {

@@ -3,7 +3,9 @@
 extern crate test;
 use test::Bencher;
 
-use marked_cycles::{lamination::Lamination, marked_cycle_cover::MarkedCycleCover, dynatomic_cover::DynatomicCover};
+use marked_cycles::{
+    dynatomic_cover::DynatomicCover, lamination::Lamination, marked_cycle_cover::MarkedCycleCover,
+};
 
 #[bench]
 fn lamination(b: &mut Bencher)

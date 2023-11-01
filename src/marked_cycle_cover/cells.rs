@@ -16,8 +16,7 @@ impl Face
     pub fn edges(&self) -> Vec<(AbstractCycle, AbstractCycle)>
     {
         let mut edges = Vec::new();
-        for i in 0..self.vertices.len()
-        {
+        for i in 0..self.vertices.len() {
             edges.push((
                 self.vertices[i],
                 self.vertices[(i + 1) % self.vertices.len()],

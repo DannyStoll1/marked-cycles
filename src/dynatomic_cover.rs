@@ -14,8 +14,7 @@ fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAng
     orbit.push(angle);
     let mut theta = angle * 2 % max_angle;
 
-    while theta != angle
-    {
+    while theta != angle {
         orbit.push(theta);
         theta = theta * 2 % max_angle;
     }
@@ -76,17 +75,14 @@ impl DynatomicCoverBuilder
     fn cycles(&self) -> Vec<Option<ShiftedCycle>>
     {
         let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
-        for theta in 0..self.max_angle.into()
-        {
+        for theta in 0..self.max_angle.into() {
             let theta_usize = usize::try_from(theta).unwrap();
-            if cycles[theta_usize].is_some()
-            {
+            if cycles[theta_usize].is_some() {
                 continue;
             }
 
             let orbit = self.orbit(theta.into());
-            if orbit.len() == self.period as usize
-            {
+            if orbit.len() == self.period as usize {
                 let (rep_idx, cycle_rep) = orbit.iter().enumerate().min_by_key(|x| x.1).unwrap();
                 let cycle_rep = AbstractPoint::new(*cycle_rep, self.period);
 
@@ -104,8 +100,7 @@ impl DynatomicCoverBuilder
                     });
             }
         }
-        if self.period == 1
-        {
+        if self.period == 1 {
             let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
             cycles.push(Some(ShiftedCycle {
                 rep: alpha_fp,
@@ -197,8 +192,7 @@ impl DynatomicCoverBuilder
         vertices
             .iter()
             .filter_map(|cyc| {
-                if visited.contains(cyc)
-                {
+                if visited.contains(cyc) {
                     return None;
                 }
                 Some(self.traverse_face(*cyc, &mut visited))
@@ -220,13 +214,10 @@ impl DynatomicCoverBuilder
         let mut nodes = Vec::new();
         let mut face_degree = 1;
 
-        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle)
-        {
+        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle) {
             // If we are crossing the real axis
-            if curr_angle >= next_angle
-            {
-                if node.rep.angle == starting_point.rep.angle
-                {
+            if curr_angle >= next_angle {
+                if node.rep.angle == starting_point.rep.angle {
                     break;
                 }
                 visited.insert(node);
@@ -239,8 +230,7 @@ impl DynatomicCoverBuilder
             curr_angle = next_angle;
         }
 
-        if nodes.is_empty()
-        {
+        if nodes.is_empty() {
             nodes.push(node);
         }
 
@@ -333,62 +323,44 @@ impl DynatomicCover
     pub fn summarize(&self, indent: usize, binary: bool)
     {
         let indent_str = " ".repeat(indent);
-
-        if binary
-        {
-            println!("\n{} vertices:", self.vertices.len());
-            for v in &self.vertices
-            {
-                println!("{}{:b}", indent_str, v.to_point());
-            }
-
-            println!("\n{} edges:", self.edges.len());
-            for edge in &self.edges
-            {
-                println!("{}{:b}", indent_str, edge);
-            }
-
-            println!("\n{} primitive faces:", self.primitive_faces.len());
-            for face in self.primitive_faces.iter()
-            {
-                println!("{}{:b}", indent_str, face);
-            }
-
-            println!("\n{} satellite faces:", self.satellite_faces.len());
-            for face in self.satellite_faces.iter()
-            {
-                println!("{}{:b}", indent_str, face);
-            }
-        }
-        else
-        {
-            println!("\n{} vertices:", self.vertices.len());
-            for v in &self.vertices
-            {
-                println!("{}{}", indent_str, v.to_point());
-            }
-
-            println!("\n{} edges:", self.edges.len());
-            for edge in &self.edges
-            {
-                println!("{}{}", indent_str, edge);
-            }
-
-            println!("\n{} primitive faces:", self.primitive_faces.len());
-            for face in self.primitive_faces.iter()
-            {
-                println!("{}{}", indent_str, face);
-            }
-
-            println!("\n{} satellite faces:", self.satellite_faces.len());
-            for face in self.satellite_faces.iter()
-            {
-                println!("{}{}", indent_str, face);
-            }
+        macro_rules! print_elements {
+            ($title: expr, $iter: expr, $count: expr) => {
+                if $count > crate::MAX_DISPLAY_ITEMS {
+                    println!("\n{} {}", $count, $title);
+                } else {
+                    println!("\n{} {}:", $count, $title);
+                    for elem in $iter {
+                        if binary {
+                            println!("{indent_str}{elem:b}");
+                        } else {
+                            println!("{indent_str}{elem}");
+                        }
+                    }
+                }
+            };
         }
 
-        println!("\nFace sizes:");
-        println!("{}{:?}", indent_str, self.face_sizes());
+        print_elements!(
+            "vertices",
+            self.vertices.iter().map(|v| v.to_point()),
+            self.vertices.len()
+        );
+        print_elements!("edges", &self.edges, self.edges.len());
+        print_elements!(
+            "primitive faces",
+            &self.primitive_faces,
+            self.primitive_faces.len()
+        );
+        print_elements!(
+            "satellite faces",
+            &self.satellite_faces,
+            self.satellite_faces.len()
+        );
+
+        if self.primitive_faces.len() < crate::MAX_DISPLAY_ITEMS {
+            println!("\nFace sizes:");
+            println!("{}{:?}", indent_str, self.face_sizes());
+        }
 
         println!(
             "\nSmallest face: {}",

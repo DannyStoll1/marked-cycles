@@ -13,8 +13,7 @@ fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAng
     orbit.push(angle);
     let mut theta = angle * 2 % max_angle;
 
-    while theta != angle
-    {
+    while theta != angle {
         orbit.push(theta);
         theta = theta * 2 % max_angle;
     }
@@ -72,17 +71,14 @@ impl MarkedCycleCoverBuilder
     fn cycles(&self) -> Vec<Option<AbstractCycle>>
     {
         let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
-        for theta in 0..self.max_angle.into()
-        {
+        for theta in 0..self.max_angle.into() {
             let theta_usize = usize::try_from(theta).unwrap();
-            if cycles[theta_usize].is_some()
-            {
+            if cycles[theta_usize].is_some() {
                 continue;
             }
 
             let orbit = self.orbit(theta.into());
-            if orbit.len() == self.period as usize
-            {
+            if orbit.len() == self.period as usize {
                 let cycle_rep = orbit.iter().min().unwrap();
                 let cycle_rep = AbstractPoint::new(*cycle_rep, self.period);
 
@@ -95,8 +91,7 @@ impl MarkedCycleCoverBuilder
                     });
             }
         }
-        if self.period == 1
-        {
+        if self.period == 1 {
             let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
             cycles.push(Some(AbstractCycle { rep: alpha_fp }));
         }
@@ -128,8 +123,7 @@ impl MarkedCycleCoverBuilder
                 let cyc0 = cycles[k0]?;
                 let cyc1 = cycles[k1]?;
 
-                if cyc0 == cyc1
-                {
+                if cyc0 == cyc1 {
                     return None;
                 }
 
@@ -158,8 +152,7 @@ impl MarkedCycleCoverBuilder
             .iter()
             .cloned()
             .filter_map(|cyc| {
-                if visited.contains(&cyc)
-                {
+                if visited.contains(&cyc) {
                     return None;
                 }
                 let k = usize::try_from(cyc.rep.bit_flip().angle).ok()?;
@@ -188,13 +181,10 @@ impl MarkedCycleCoverBuilder
 
         let mut face_degree = 1;
 
-        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle)
-        {
+        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle) {
             // If we are crossing the real axis
-            if curr_angle >= next_angle
-            {
-                if node.rep.angle == starting_point.rep.angle
-                {
+            if curr_angle >= next_angle {
+                if node.rep.angle == starting_point.rep.angle {
                     break;
                 }
                 visited.insert(node);
@@ -207,8 +197,7 @@ impl MarkedCycleCoverBuilder
             curr_angle = next_angle;
         }
 
-        if nodes.is_empty()
-        {
+        if nodes.is_empty() {
             nodes.push(node);
         }
 
@@ -295,49 +284,31 @@ impl MarkedCycleCover
     pub fn summarize(&self, indent: usize, binary: bool)
     {
         let indent_str = " ".repeat(indent);
-
-        println!("\n{} vertices:", self.vertices.len());
-        if binary
-        {
-            for v in &self.vertices
-            {
-                println!("{}{:b}", indent_str, v);
-            }
-
-            println!("\n{} edges:", self.edges.len());
-            for edge in &self.edges
-            {
-                println!("{}{:b}", indent_str, edge);
-            }
-
-            println!("\n{} faces:", self.faces.len());
-            for face in self.faces.iter()
-            {
-                println!("{}{:b}", indent_str, face);
-            }
-        }
-        else
-        {
-            for v in &self.vertices
-            {
-                println!("{}{}", indent_str, v);
-            }
-
-            println!("\n{} edges:", self.edges.len());
-            for edge in &self.edges
-            {
-                println!("{}{}", indent_str, edge);
-            }
-
-            println!("\n{} faces:", self.faces.len());
-            for face in self.faces.iter()
-            {
-                println!("{}{}", indent_str, face);
-            }
+        macro_rules! print_elements {
+            ($title: expr, $iter: expr, $count: expr) => {
+                if $count > crate::MAX_DISPLAY_ITEMS {
+                    println!("\n{} {}", $count, $title);
+                } else {
+                    println!("\n{} {}:", $count, $title);
+                    for elem in $iter {
+                        if binary {
+                            println!("{indent_str}{elem:b}");
+                        } else {
+                            println!("{indent_str}{elem}");
+                        }
+                    }
+                }
+            };
         }
 
-        println!("\nFace sizes:");
-        println!("{}{:?}", indent_str, self.face_sizes().collect::<Vec<_>>());
+        print_elements!("vertices", &self.vertices, self.vertices.len());
+        print_elements!("edges", &self.edges, self.edges.len());
+        print_elements!("faces", &self.faces, self.faces.len());
+
+        if self.faces.len() < crate::MAX_DISPLAY_ITEMS {
+            println!("\nFace sizes:");
+            println!("{}{:?}", indent_str, self.face_sizes().collect::<Vec<_>>());
+        }
 
         println!("\nSmallest face: {}", self.face_sizes().min().unwrap());
         println!("\nLargest face: {}", self.face_sizes().max().unwrap());

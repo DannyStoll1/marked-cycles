@@ -1,7 +1,7 @@
 use crate::types::{INum, Period};
 
-pub mod marked_cycle;
 pub mod dynatomic;
+pub mod marked_cycle;
 
 // TODO: add CurveParams struct
 

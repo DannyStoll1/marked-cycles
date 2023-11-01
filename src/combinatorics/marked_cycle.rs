@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use super::Combinatorics;
+use crate::arithmetic::*;
 use crate::marked_cycle_cover::MarkedCycleCover;
 use crate::types::{INum, Period};
-use crate::arithmetic::*;
 use num::pow;
 
 pub struct Comb
@@ -65,8 +65,7 @@ impl Combinatorics for Comb
         // Number of points of period dividing n
         // under z -> z^(+/- 2)
         let v = n.try_into().unwrap_or(0);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => pow(2, v) - 1,
             2 => pow(2, v) - pow(-1, v),
             _ => 0,
@@ -92,8 +91,7 @@ impl Combinatorics for Comb
     {
         // Number of mateable hyperbolic components of period dividing n
         let v = n.try_into().unwrap_or(0);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => pow(2, v) / 2,
             2 => (pow(2, v) - pow(-1, v)) / 3,
             _ => 0,
@@ -125,8 +123,7 @@ impl Combinatorics for Comb
     {
         let symmetry_order = self.crit_period + 1;
 
-        if n % symmetry_order > 0
-        {
+        if n % symmetry_order > 0 {
             return 0;
         }
 
@@ -174,8 +171,7 @@ impl Combinatorics for Comb
         let prim = self.primitive_components(n);
         let cyc = self.cycles(n);
         let selfconj = self.self_conjugate_faces(n);
-        match self.crit_period
-        {
+        match self.crit_period {
             1 => 1 + (2 * prim - 3 * cyc - selfconj) / 4,
             2 => 1 + (3 * prim - 4 * cyc - 2 * selfconj) / 6,
             _ => 0,

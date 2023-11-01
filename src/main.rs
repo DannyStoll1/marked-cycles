@@ -38,20 +38,16 @@ struct Args
 
 fn print_combinatorics(args: &Args)
 {
-    if args.marked_period > 0
-    {
+    if args.marked_period > 0 {
         println!(
             "Computing combinatorics of (c,lambda) -> c cover for marked period {}, critical period {}",
             args.marked_period, args.crit_period
         );
 
-        if args.dynatomic
-        {
+        if args.dynatomic {
             let cov = DynatomicCover::new(args.marked_period, args.crit_period);
             cov.summarize(args.indent, args.binary);
-        }
-        else
-        {
+        } else {
             let cov = MarkedCycleCover::new(args.marked_period, args.crit_period);
             cov.summarize(args.indent, args.binary);
         }
@@ -66,20 +62,15 @@ macro_rules! print_row {
 
 fn print_data_table(args: &Args)
 {
-    let p2: Box<dyn Combinatorics> = if args.dynatomic
-    {
+    let p2: Box<dyn Combinatorics> = if args.dynatomic {
         Box::new(dynatomic::Comb::new(args.crit_period))
-    }
-    else
-    {
+    } else {
         Box::new(marked_cycle::Comb::new(args.crit_period))
     };
 
-    if args.table_max_period > 0
-    {
+    if args.table_max_period > 0 {
         print_row!("period", "vertices", "edges", "faces", "genus");
-        for period in 2..=args.table_max_period
-        {
+        for period in 2..=args.table_max_period {
             print_row!(
                 period,
                 p2.vertices(period),
