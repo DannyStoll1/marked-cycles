@@ -1,26 +1,28 @@
-use crate::abstract_cycles::{AbstractPoint, ShiftedCycle};
-use crate::global_state::{MAX_ANGLE, PERIOD, set_period};
+use crate::abstract_cycles::{AbstractPoint, AbstractPointClass, ShiftedCycle};
+use crate::common::{
+    cells::{self, Wake},
+    get_orbit,
+};
+use crate::global_state::{set_period, MAX_ANGLE, PERIOD};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
+use num::Integer;
 use std::collections::{HashMap, HashSet};
 
-mod cells;
-use cells::{Edge, PrimitiveFace, SatelliteFace, Wake};
-use num::Integer;
+type Vertex = ShiftedCycle;
+type Edge = cells::Edge<Vertex>;
+type PrimitiveFace = cells::Face<Vertex, AbstractPointClass>;
+type SatelliteFace = cells::Face<Vertex, Vertex>;
 
-fn get_orbit(angle: IntAngle) -> Vec<IntAngle>
+#[derive(PartialEq, Eq)]
+struct EdgeRep(pub Edge);
+
+impl EdgeRep
 {
-    let mut orbit = Vec::with_capacity(PERIOD.get() as usize);
-
-    orbit.push(angle);
-    let mut theta = angle * 2 % MAX_ANGLE.get();
-
-    while theta != angle {
-        orbit.push(theta);
-        theta = theta * 2 % MAX_ANGLE.get();
+    pub fn is_satellite(&self) -> bool
+    {
+        self.0.start.matches(self.0.end)
     }
-
-    orbit
 }
 
 #[derive(Debug, PartialEq)]
@@ -48,11 +50,11 @@ impl DynatomicCoverBuilder
     {
         set_period(self.period);
         let cycles = self.cycles();
-        let wakes = self.wakes(&cycles);
+        let edge_reps = self.edge_reps(&cycles);
         let vertices = self.vertices(&cycles);
-        let edges = self.edges(&wakes);
+        let edges = self.edges(&edge_reps);
         let primitive_faces = self.primitive_faces(&vertices);
-        let satellite_faces = self.satellite_faces(&wakes);
+        let satellite_faces = self.satellite_faces(&edge_reps);
 
         DynatomicCover {
             crit_period: self.crit_period,
@@ -113,7 +115,7 @@ impl DynatomicCoverBuilder
         cycles.iter().filter_map(|&v| v).collect::<Vec<_>>()
     }
 
-    fn wakes(&mut self, cycles: &[Option<ShiftedCycle>]) -> Vec<Wake>
+    fn edge_reps(&mut self, cycles: &[Option<ShiftedCycle>]) -> Vec<EdgeRep>
     {
         // Leaves of lamination, labeled by shifted cycle
         Lamination::new()
@@ -140,43 +142,46 @@ impl DynatomicCoverBuilder
                     .or_insert_with(Vec::new)
                     .push((cyc0, cyc1.shift, tag));
 
-                Some(Wake {
-                    theta0: cyc0,
-                    theta1: cyc1,
-                })
+                Some(EdgeRep(Edge {
+                    start: cyc0,
+                    end: cyc1,
+                    wake: Wake { angle0, angle1 },
+                }))
             })
             .collect()
     }
 
-    fn edges(&mut self, wakes: &[Wake]) -> Vec<Edge>
+    fn edges(&mut self, wakes: &[EdgeRep]) -> Vec<Edge>
     {
         wakes
             .iter()
-            .flat_map(|w| {
+            .flat_map(|EdgeRep(e)| {
                 (0..self.period).map(|i| Edge {
-                    start: w.theta0.rotate(i),
-                    end: w.theta1.rotate(i),
+                    start: e.start.rotate(i),
+                    end: e.end.rotate(i),
+                    wake: e.wake.clone(),
                 })
             })
             .collect()
     }
 
-    fn satellite_faces(&self, wakes: &[Wake]) -> Vec<SatelliteFace>
+    fn satellite_faces(&self, wakes: &[EdgeRep]) -> Vec<SatelliteFace>
     {
         wakes
             .iter()
             .filter(|e| e.is_satellite())
-            .flat_map(|e| {
-                let shift = e.theta1.relative_shift(e.theta0);
+            .flat_map(|EdgeRep(e)| {
+                let shift = e.end.relative_shift(e.start);
                 let num_faces = shift.gcd(&self.period);
                 let face_period = self.period / num_faces;
                 (0..num_faces).map(move |i| {
-                    let base_point = e.theta0.with_shift(0).rotate(i);
+                    let base_point = e.start.with_shift(0).rotate(i);
                     SatelliteFace {
                         label: base_point,
                         vertices: (0..face_period)
                             .map(|j| base_point.rotate(j * num_faces))
                             .collect(),
+                        degree: 1,
                     }
                 })
             })

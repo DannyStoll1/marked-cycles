@@ -1,29 +1,15 @@
 use crate::abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint};
-use crate::global_state::{PERIOD, MAX_ANGLE, set_period};
+use crate::global_state::{set_period, MAX_ANGLE, PERIOD};
+use crate::common::{get_orbit, cells};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
 use std::collections::{HashMap, HashSet};
 
-mod cells;
-use cells::{Edge, Face};
+type Vertex = AbstractCycle;
+type Edge = cells::Edge<Vertex>;
+type Face = cells::Face<Vertex, AbstractCycleClass>;
 
 use self::cells::Wake;
-
-#[inline]
-fn get_orbit(angle: IntAngle) -> Vec<IntAngle>
-{
-    let mut orbit = Vec::with_capacity(PERIOD.get() as usize);
-
-    orbit.push(angle);
-    let mut theta = angle * 2 % MAX_ANGLE.get();
-
-    while theta != angle {
-        orbit.push(theta);
-        theta = theta * 2 % MAX_ANGLE.get();
-    }
-
-    orbit
-}
 
 #[derive(Debug, PartialEq)]
 pub struct MarkedCycleCoverBuilder

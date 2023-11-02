@@ -3,6 +3,7 @@
 pub mod abstract_cycles;
 pub mod arithmetic;
 pub mod combinatorics;
+pub mod common;
 pub mod dynatomic_cover;
 pub mod global_state;
 pub mod lamination;

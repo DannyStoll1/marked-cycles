@@ -1,5 +1,5 @@
-use crate::types::{IntAngle, KneadingSequence, Period};
 use crate::global_state::{MAX_ANGLE, PERIOD};
+use crate::types::{IntAngle, KneadingSequence, Period};
 
 #[derive(Clone, Copy, Debug, Hash)]
 pub struct AbstractPoint
@@ -12,17 +12,13 @@ impl AbstractPoint
     #[must_use]
     pub const fn new(angle: IntAngle) -> Self
     {
-        Self {
-            angle,
-        }
+        Self { angle }
     }
 
     #[must_use]
     pub const fn with_angle(self, angle: IntAngle) -> Self
     {
-        Self {
-            angle,
-        }
+        Self { angle }
     }
 
     #[must_use]
@@ -81,7 +77,6 @@ impl AbstractPoint
     #[must_use]
     pub fn kneading_sequence(&self) -> KneadingSequence
     {
-        println!("Computing kneading sequence");
         let mut ks = KneadingSequence::default();
         let mut theta = self.angle;
 

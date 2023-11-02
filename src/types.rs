@@ -3,6 +3,8 @@ use std::num::TryFromIntError;
 use derive_more::*;
 use num_rational::Rational64;
 
+use crate::global_state::PERIOD;
+
 pub type Period = i64;
 pub type UPeriod = u64;
 pub type INum = i64;
@@ -84,14 +86,17 @@ pub struct KneadingSequence
     itinerary: i64,
 }
 
-impl KneadingSequence {
+impl KneadingSequence
+{
     #[inline]
-    pub fn increment(&mut self) {
+    pub fn increment(&mut self)
+    {
         self.itinerary += 1;
     }
 
     #[inline]
-    pub fn shift(&mut self) {
+    pub fn shift(&mut self)
+    {
         self.itinerary <<= 1;
     }
 }
@@ -100,7 +105,11 @@ impl std::fmt::Display for KneadingSequence
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        let width = f.width().unwrap_or(17);
-        write!(f, "{:0>width$b}*", self.itinerary >> 1, width = width - 1)
+        write!(
+            f,
+            "{:0>width$b}*",
+            self.itinerary >> 1,
+            width = (PERIOD.get() - 1) as usize
+        )
     }
 }
