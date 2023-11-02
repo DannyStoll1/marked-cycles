@@ -1,4 +1,5 @@
 use crate::abstract_cycles::{AbstractPoint, ShiftedCycle};
+use crate::global_state::{MAX_ANGLE, PERIOD, set_period};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
 use std::collections::{HashMap, HashSet};
@@ -7,16 +8,16 @@ mod cells;
 use cells::{Edge, PrimitiveFace, SatelliteFace, Wake};
 use num::Integer;
 
-fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAngle>
+fn get_orbit(angle: IntAngle) -> Vec<IntAngle>
 {
-    let mut orbit = Vec::with_capacity(period as usize);
+    let mut orbit = Vec::with_capacity(PERIOD.get() as usize);
 
     orbit.push(angle);
-    let mut theta = angle * 2 % max_angle;
+    let mut theta = angle * 2 % MAX_ANGLE.get();
 
     while theta != angle {
         orbit.push(theta);
-        theta = theta * 2 % max_angle;
+        theta = theta * 2 % MAX_ANGLE.get();
     }
 
     orbit
@@ -27,7 +28,6 @@ pub struct DynatomicCoverBuilder
 {
     pub period: Period,
     pub crit_period: Period,
-    max_angle: IntAngle,
     adjacency_map: HashMap<AbstractPoint, Vec<(ShiftedCycle, Period, IntAngle)>>,
 }
 
@@ -36,12 +36,9 @@ impl DynatomicCoverBuilder
     #[must_use]
     pub fn new(period: Period, crit_period: Period) -> Self
     {
-        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap()) - 1);
-
         Self {
             period,
             crit_period,
-            max_angle,
             adjacency_map: HashMap::new(),
         }
     }
@@ -49,6 +46,7 @@ impl DynatomicCoverBuilder
     #[must_use]
     pub fn build(&mut self) -> DynatomicCover
     {
+        set_period(self.period);
         let cycles = self.cycles();
         let wakes = self.wakes(&cycles);
         let vertices = self.vertices(&cycles);
@@ -57,7 +55,6 @@ impl DynatomicCoverBuilder
         let satellite_faces = self.satellite_faces(&wakes);
 
         DynatomicCover {
-            period: self.period,
             crit_period: self.crit_period,
             vertices,
             edges,
@@ -69,13 +66,13 @@ impl DynatomicCoverBuilder
     #[inline]
     fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
     {
-        get_orbit(angle, self.max_angle, self.period)
+        get_orbit(angle)
     }
 
     fn cycles(&self) -> Vec<Option<ShiftedCycle>>
     {
-        let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
-        for theta in 0..self.max_angle.into() {
+        let mut cycles = vec![None; usize::try_from(MAX_ANGLE.get()).unwrap()];
+        for theta in 0..MAX_ANGLE.get().into() {
             let theta_usize = usize::try_from(theta).unwrap();
             if cycles[theta_usize].is_some() {
                 continue;
@@ -84,14 +81,14 @@ impl DynatomicCoverBuilder
             let orbit = self.orbit(theta.into());
             if orbit.len() == self.period as usize {
                 let (rep_idx, cycle_rep) = orbit.iter().enumerate().min_by_key(|x| x.1).unwrap();
-                let cycle_rep = AbstractPoint::new(*cycle_rep, self.period);
+                let cycle_rep = AbstractPoint::new(*cycle_rep);
 
                 orbit
                     .iter()
                     .map(|x| usize::try_from(*x).unwrap_or_default())
                     .enumerate()
                     .for_each(|(i, x)| {
-                        let shift = ((i as i64) - (rep_idx as i64)).rem_euclid(self.period);
+                        let shift = ((i as i64) - (rep_idx as i64)).rem_euclid(PERIOD.get());
                         let shifted_cycle = ShiftedCycle {
                             rep: cycle_rep,
                             shift,
@@ -100,8 +97,8 @@ impl DynatomicCoverBuilder
                     });
             }
         }
-        if self.period == 1 {
-            let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
+        if PERIOD.get() == 1 {
+            let alpha_fp = AbstractPoint::new(IntAngle(1));
             cycles.push(Some(ShiftedCycle {
                 rep: alpha_fp,
                 shift: 0,
@@ -124,8 +121,8 @@ impl DynatomicCoverBuilder
             .into_arcs_of_period(self.period)
             .into_iter()
             .filter_map(|(theta0, theta1)| {
-                let angle0 = self.max_angle.scale_by_ratio(&theta0);
-                let angle1 = self.max_angle.scale_by_ratio(&theta1);
+                let angle0 = MAX_ANGLE.get().scale_by_ratio(&theta0);
+                let angle1 = MAX_ANGLE.get().scale_by_ratio(&theta1);
 
                 let k0 = usize::try_from(angle0).ok()?;
                 let k1 = usize::try_from(angle1).ok()?;
@@ -250,7 +247,7 @@ impl DynatomicCoverBuilder
         self.adjacency_map
             .get(&node.rep)?
             .iter()
-            .min_by_key(|(_, _, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(self.max_angle.0))
+            .min_by_key(|(_, _, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(MAX_ANGLE.get().0))
             .map(|(beta, alpha_shift, ang)| (beta.rotate(node.shift - alpha_shift), *ang))
     }
 }
@@ -258,7 +255,6 @@ impl DynatomicCoverBuilder
 #[derive(Debug, PartialEq, Eq)]
 pub struct DynatomicCover
 {
-    pub period: Period,
     pub crit_period: Period,
     pub vertices: Vec<ShiftedCycle>,
     pub edges: Vec<Edge>,

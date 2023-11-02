@@ -1,2 +1,8 @@
 target
 Cargo.lock
+notes
+oeis
+perf.data*
+bacon.toml
+*.bak
+*.old

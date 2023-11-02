@@ -1,23 +1,19 @@
 use crate::types::{IntAngle, KneadingSequence, Period};
+use crate::global_state::{MAX_ANGLE, PERIOD};
 
 #[derive(Clone, Copy, Debug, Hash)]
 pub struct AbstractPoint
 {
     pub angle: IntAngle,
-    pub period: Period,
-    pub(crate) max_angle: IntAngle,
 }
 
 impl AbstractPoint
 {
     #[must_use]
-    pub const fn new(angle: IntAngle, period: Period) -> Self
+    pub const fn new(angle: IntAngle) -> Self
     {
-        let max_angle = IntAngle((1 << period) - 1);
         Self {
             angle,
-            period,
-            max_angle,
         }
     }
 
@@ -26,8 +22,6 @@ impl AbstractPoint
     {
         Self {
             angle,
-            period: self.period,
-            max_angle: self.max_angle,
         }
     }
 
@@ -38,7 +32,7 @@ impl AbstractPoint
         let mut min_theta = theta;
 
         while theta != self.angle {
-            theta = (theta * 2) % self.max_angle;
+            theta = (theta * 2) % MAX_ANGLE.get();
             min_theta = min_theta.min(theta);
         }
         self.with_angle(min_theta)
@@ -47,14 +41,14 @@ impl AbstractPoint
     #[must_use]
     pub fn rotate(&self, shift: Period) -> Self
     {
-        let rep = (self.angle << shift) % self.max_angle;
+        let rep = (self.angle << shift) % MAX_ANGLE.get();
         self.with_angle(rep)
     }
 
     #[must_use]
     pub fn bit_flip(&self) -> Self
     {
-        self.with_angle(self.max_angle & !self.angle)
+        self.with_angle(MAX_ANGLE.get() & !self.angle)
     }
 
     #[must_use]
@@ -65,13 +59,13 @@ impl AbstractPoint
         let mut min_theta = theta;
 
         let u0 = self.angle / 2;
-        let u1 = (self.max_angle + self.angle) / 2;
+        let u1 = (MAX_ANGLE.get() + self.angle) / 2;
 
         loop {
             if theta <= u0 || theta > u1 {
                 ks.increment();
             }
-            theta = (theta * 2) % self.max_angle;
+            theta = (theta * 2) % MAX_ANGLE.get();
 
             if theta == self.angle {
                 break;
@@ -92,14 +86,14 @@ impl AbstractPoint
         let mut theta = self.angle;
 
         let u0 = self.angle / 2;
-        let u1 = (self.max_angle + self.angle) / 2;
+        let u1 = (MAX_ANGLE.get() + self.angle) / 2;
 
-        for _ in 0..self.period {
+        for _ in 0..PERIOD.get() {
             ks.shift();
             if theta <= u0 || theta > u1 {
                 ks.increment();
             }
-            theta = (theta * 2) % self.max_angle;
+            theta = (theta * 2) % MAX_ANGLE.get();
         }
         ks
     }
@@ -141,7 +135,7 @@ impl std::fmt::Binary for AbstractPoint
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "{:0n$b}", self.angle, n = self.period as usize)
+        write!(f, "{:0n$b}", self.angle, n = PERIOD.get() as usize)
     }
 }
 
@@ -172,7 +166,7 @@ impl std::fmt::Binary for AbstractPointClass
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "[{:0n$b}]", self.rep.angle, n = self.rep.period as usize)
+        write!(f, "[{:0n$b}]", self.rep.angle, n = PERIOD.get() as usize)
     }
 }
 
@@ -226,7 +220,7 @@ impl std::fmt::Binary for AbstractCycle
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "({:0n$b})", self.rep.angle, n = self.rep.period as usize)
+        write!(f, "({:0n$b})", self.rep.angle, n = PERIOD.get() as usize)
     }
 }
 
@@ -287,7 +281,7 @@ impl std::fmt::Binary for AbstractCycleClass
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "<{:0n$b}>", self.rep.angle, n = self.rep.period as usize)
+        write!(f, "<{:0n$b}>", self.rep.angle, n = PERIOD.get() as usize)
     }
 }
 
@@ -325,16 +319,16 @@ impl ShiftedCycle
 
     // Get shift of self relative to another shifted cycle
     #[must_use]
-    pub const fn relative_shift(&self, other: Self) -> Period
+    pub fn relative_shift(&self, other: Self) -> Period
     {
-        (self.shift - other.shift).rem_euclid(self.rep.period)
+        (self.shift - other.shift).rem_euclid(PERIOD.get())
     }
 
     // Return self, rotated by a given shift
     #[must_use]
-    pub const fn rotate(self, shift: Period) -> Self
+    pub fn rotate(self, shift: Period) -> Self
     {
-        let new_shift = (self.shift + shift).rem_euclid(self.rep.period);
+        let new_shift = (self.shift + shift).rem_euclid(PERIOD.get());
         Self {
             rep: self.rep,
             shift: new_shift,
@@ -381,7 +375,7 @@ impl std::fmt::Binary for ShiftedCycle
             "[{:0n$b}; {}]",
             self.rep.angle,
             self.shift,
-            n = self.rep.period as usize
+            n = PERIOD.get() as usize
         )
     }
 }

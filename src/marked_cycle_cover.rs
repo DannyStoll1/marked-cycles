@@ -1,4 +1,5 @@
 use crate::abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint};
+use crate::global_state::{PERIOD, MAX_ANGLE, set_period};
 use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
 use std::collections::{HashMap, HashSet};
@@ -8,16 +9,17 @@ use cells::{Edge, Face};
 
 use self::cells::Wake;
 
-fn get_orbit(angle: IntAngle, max_angle: IntAngle, period: Period) -> Vec<IntAngle>
+#[inline]
+fn get_orbit(angle: IntAngle) -> Vec<IntAngle>
 {
-    let mut orbit = Vec::with_capacity(period as usize);
+    let mut orbit = Vec::with_capacity(PERIOD.get() as usize);
 
     orbit.push(angle);
-    let mut theta = angle * 2 % max_angle;
+    let mut theta = angle * 2 % MAX_ANGLE.get();
 
     while theta != angle {
         orbit.push(theta);
-        theta = theta * 2 % max_angle;
+        theta = theta * 2 % MAX_ANGLE.get();
     }
 
     orbit
@@ -28,7 +30,6 @@ pub struct MarkedCycleCoverBuilder
 {
     pub period: Period,
     pub crit_period: Period,
-    max_angle: IntAngle,
     adjacency_map: HashMap<AbstractCycle, Vec<(AbstractCycle, IntAngle)>>,
 }
 
@@ -37,12 +38,9 @@ impl MarkedCycleCoverBuilder
     #[must_use]
     pub fn new(period: Period, crit_period: Period) -> Self
     {
-        let max_angle = IntAngle(2_i64.pow(period.try_into().unwrap()) - 1);
-
         Self {
             period,
             crit_period,
-            max_angle,
             adjacency_map: HashMap::new(),
         }
     }
@@ -50,13 +48,13 @@ impl MarkedCycleCoverBuilder
     #[must_use]
     pub fn build(&mut self) -> MarkedCycleCover
     {
+        set_period(self.period);
         let cycles = self.cycles();
         let vertices = self.vertices(&cycles);
         let edges = self.edges(&cycles);
         let faces = self.faces(&vertices);
 
         MarkedCycleCover {
-            period: self.period,
             crit_period: self.crit_period,
             vertices,
             edges,
@@ -67,22 +65,22 @@ impl MarkedCycleCoverBuilder
     #[inline]
     fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
     {
-        get_orbit(angle, self.max_angle, self.period)
+        get_orbit(angle)
     }
 
     fn cycles(&self) -> Vec<Option<AbstractCycle>>
     {
-        let mut cycles = vec![None; usize::try_from(self.max_angle).unwrap()];
-        for theta in 0..self.max_angle.into() {
+        let mut cycles = vec![None; usize::try_from(MAX_ANGLE.get()).unwrap()];
+        for theta in 0..MAX_ANGLE.get().into() {
             let theta_usize = usize::try_from(theta).unwrap();
             if cycles[theta_usize].is_some() {
                 continue;
             }
 
             let orbit = self.orbit(theta.into());
-            if orbit.len() == self.period as usize {
+            if orbit.len() == PERIOD.get() as usize {
                 let cycle_rep = orbit.iter().min().unwrap();
-                let cycle_rep = AbstractPoint::new(*cycle_rep, self.period);
+                let cycle_rep = AbstractPoint::new(*cycle_rep);
 
                 orbit
                     .iter()
@@ -93,8 +91,8 @@ impl MarkedCycleCoverBuilder
                     });
             }
         }
-        if self.period == 1 {
-            let alpha_fp = AbstractPoint::new(IntAngle(1), 1);
+        if PERIOD.get() == 1 {
+            let alpha_fp = AbstractPoint::new(IntAngle(1));
             cycles.push(Some(AbstractCycle { rep: alpha_fp }));
         }
         cycles
@@ -113,11 +111,11 @@ impl MarkedCycleCoverBuilder
     {
         Lamination::new()
             .with_crit_period(self.crit_period)
-            .into_arcs_of_period(self.period)
+            .into_arcs_of_period(PERIOD.get())
             .into_iter()
             .filter_map(|(theta0, theta1)| {
-                let angle0 = self.max_angle.scale_by_ratio(&theta0);
-                let angle1 = self.max_angle.scale_by_ratio(&theta1);
+                let angle0 = MAX_ANGLE.get().scale_by_ratio(&theta0);
+                let angle1 = MAX_ANGLE.get().scale_by_ratio(&theta1);
 
                 let k0 = usize::try_from(angle0).ok()?;
                 let k1 = usize::try_from(angle1).ok()?;
@@ -217,7 +215,7 @@ impl MarkedCycleCoverBuilder
         self.adjacency_map
             .get(&node)?
             .iter()
-            .min_by_key(|(_, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(self.max_angle.0))
+            .min_by_key(|(_, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(MAX_ANGLE.get().0))
             .cloned()
     }
 }
@@ -225,7 +223,6 @@ impl MarkedCycleCoverBuilder
 #[derive(Debug, PartialEq)]
 pub struct MarkedCycleCover
 {
-    pub period: Period,
     pub crit_period: Period,
     pub vertices: Vec<AbstractCycle>,
     pub edges: Vec<Edge>,
@@ -315,31 +312,3 @@ impl MarkedCycleCover
         println!("\nGenus is {}", self.genus());
     }
 }
-
-// impl From<Lamination> for MarkedCycleCover {
-//     fn from(value: Lamination) -> Self {
-//         let max_angle = Angle(degree.pow(period.try_into().unwrap()) - 1);
-//
-//         let ray_sets = Vec::new();
-//
-//         let cycles_with_shifts = vec![None; max_angle.try_into().unwrap()];
-//         let point_classes = vec![None; max_angle.try_into().unwrap()];
-//
-//         let mut curve = Self {
-//             period,
-//             degree,
-//             crit_period,
-//             max_angle,
-//             ray_sets,
-//             cycles: cycles_with_shifts,
-//             cycle_classes: point_classes,
-//             vertices: Vec::new(),
-//             wakes: Vec::new(),
-//             edges: Vec::new(),
-//             faces: Vec::new(),
-//             visited_face_ids: HashSet::new(),
-//         };
-//         curve.run();
-//         curve
-//     }
-// }

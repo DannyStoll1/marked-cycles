@@ -1,6 +1,6 @@
 use crate::{
     abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint},
-    types::{IntAngle, Period},
+    types::{IntAngle, Period}, global_state::PERIOD,
 };
 
 #[derive(Debug, PartialEq)]
@@ -126,15 +126,15 @@ impl std::fmt::Display for Edge
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        let ks = AbstractPoint::new(self.wake.angle0, self.start.rep.period).kneading_sequence();
+        let ks = AbstractPoint::new(self.wake.angle0).kneading_sequence();
         write!(
             f,
             "{:>digits$} -- {:<digits$}   wake = {:digits$}   KS = {ks:>period$}",
             self.start,
             self.end,
             self.wake,
-            digits = (self.start.rep.period / 3) as usize,
-            period = self.start.rep.period as usize
+            digits = (PERIOD.get() / 3) as usize,
+            period = PERIOD.get() as usize
         )
     }
 }
@@ -143,14 +143,14 @@ impl std::fmt::Binary for Edge
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        let ks = AbstractPoint::new(self.wake.angle0, self.start.rep.period).kneading_sequence();
+        let ks = AbstractPoint::new(self.wake.angle0).kneading_sequence();
         write!(
             f,
             "{:b} -- {:b}   wake = {wake:b}   KS = {ks:>period$}",
             self.start,
             self.end,
             wake = self.wake,
-            period = self.start.rep.period as usize
+            period = PERIOD.get() as usize
         )
     }
 }

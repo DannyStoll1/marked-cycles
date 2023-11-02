@@ -4,6 +4,7 @@ pub mod abstract_cycles;
 pub mod arithmetic;
 pub mod combinatorics;
 pub mod dynatomic_cover;
+pub mod global_state;
 pub mod lamination;
 pub mod marked_cycle_cover;
 pub mod types;
@@ -14,8 +15,9 @@ const MAX_DISPLAY_ITEMS: usize = 100;
 mod tests
 {
     use crate::abstract_cycles::AbstractPoint;
-    use crate::combinatorics::{marked_cycle, Combinatorics, dynatomic};
+    use crate::combinatorics::{dynatomic, marked_cycle, Combinatorics};
     use crate::dynatomic_cover::DynatomicCover;
+    use crate::global_state::PERIOD;
     use crate::lamination::Lamination;
     use crate::marked_cycle_cover::MarkedCycleCover;
     use crate::types::IntAngle;
@@ -129,7 +131,8 @@ mod tests
     #[test]
     fn kneading_sequence()
     {
-        let point = AbstractPoint::new(IntAngle(13), 6);
+        PERIOD.set(6);
+        let point = AbstractPoint::new(IntAngle(13));
         let ks = point.kneading_sequence();
         assert_eq!(format!("{:6}", ks), "00110*");
 
