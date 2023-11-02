@@ -1,6 +1,7 @@
 use crate::global_state::{MAX_ANGLE, PERIOD};
 use crate::types::IntAngle;
 
+#[must_use]
 #[inline]
 pub fn get_orbit(angle: IntAngle) -> Vec<IntAngle>
 {
@@ -21,7 +22,7 @@ pub mod cells
 {
     use crate::{
         abstract_cycles::AbstractPoint,
-        global_state::PERIOD,
+        global_state::{MAX_ANGLE, PERIOD},
         types::{IntAngle, Period},
     };
 
@@ -49,6 +50,11 @@ pub mod cells
             edges
         }
 
+        pub fn is_empty(&self) -> bool
+        {
+            self.vertices.is_empty()
+        }
+
         pub fn len(&self) -> usize
         {
             self.vertices.len()
@@ -63,7 +69,7 @@ pub mod cells
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
         {
             let vertices_as_strings: Vec<String> =
-                self.vertices.iter().map(|v| v.to_string()).collect();
+                self.vertices.iter().map(ToString::to_string).collect();
             write!(
                 f,
                 "{} = ({}); deg = {}",
@@ -81,7 +87,7 @@ pub mod cells
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
         {
             let vertices_as_strings: Vec<String> =
-                self.vertices.iter().map(|v| format!("{:b}", v)).collect();
+                self.vertices.iter().map(|v| format!("{v:b}")).collect();
             write!(
                 f,
                 "{:b} = ({}); deg = {}",
@@ -101,9 +107,10 @@ pub mod cells
 
     impl Wake
     {
-        pub fn is_satellite(&self) -> bool
+        #[must_use]
+        pub fn is_real(&self) -> bool
         {
-            self.angle0 == self.angle1
+            self.angle0 + self.angle1 == MAX_ANGLE.get()
         }
     }
 
@@ -139,7 +146,24 @@ pub mod cells
         pub wake: Wake,
     }
 
-    impl<V> Edge<V> {}
+    impl<V> Edge<V>
+    {
+        #[inline]
+        pub fn is_real(&self) -> bool
+        {
+            self.wake.is_real()
+        }
+
+        #[inline]
+        fn connector(&self) -> &str
+        {
+            if self.is_real() {
+                "==="
+            } else {
+                "---"
+            }
+        }
+    }
 
     impl<V> std::fmt::Display for Edge<V>
     where
@@ -148,9 +172,10 @@ pub mod cells
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
         {
             let ks = AbstractPoint::new(self.wake.angle0).kneading_sequence();
+            let connector = self.connector();
             write!(
                 f,
-                "{:>digits$} -- {:<digits$} \twake: {:digits$} \tKS = {ks:>period$}",
+                "{:>digits$} {connector} {:<digits$} \twake: {:digits$} \tKS = {ks:>period$}",
                 self.start,
                 self.end,
                 self.wake,

@@ -25,7 +25,7 @@ impl EdgeRep
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DynatomicCoverBuilder
 {
     pub period: Period,
@@ -51,7 +51,7 @@ impl DynatomicCoverBuilder
         set_period(self.period);
         let cycles = self.cycles();
         let edge_reps = self.edge_reps(&cycles);
-        let vertices = self.vertices(&cycles);
+        let vertices = Self::vertices(&cycles);
         let edges = self.edges(&edge_reps);
         let primitive_faces = self.primitive_faces(&vertices);
         let satellite_faces = self.satellite_faces(&edge_reps);
@@ -66,23 +66,31 @@ impl DynatomicCoverBuilder
     }
 
     #[inline]
-    fn orbit(&self, angle: IntAngle) -> Vec<IntAngle>
+    fn orbit(angle: IntAngle) -> Vec<IntAngle>
     {
         get_orbit(angle)
     }
 
     fn cycles(&self) -> Vec<Option<ShiftedCycle>>
     {
-        let mut cycles = vec![None; usize::try_from(MAX_ANGLE.get()).unwrap()];
+        let mut cycles = vec![
+            None;
+            usize::try_from(MAX_ANGLE.get())
+                .expect("MAX_ANGLE appears to be negative!")
+        ];
         for theta in 0..MAX_ANGLE.get().into() {
-            let theta_usize = usize::try_from(theta).unwrap();
+            let theta_usize = theta as usize;
             if cycles[theta_usize].is_some() {
                 continue;
             }
 
-            let orbit = self.orbit(theta.into());
+            let orbit = get_orbit(theta.into());
             if orbit.len() == self.period as usize {
-                let (rep_idx, cycle_rep) = orbit.iter().enumerate().min_by_key(|x| x.1).unwrap();
+                let (rep_idx, cycle_rep) = orbit
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|x| x.1)
+                    .expect("Orbit is empty!");
                 let cycle_rep = AbstractPoint::new(*cycle_rep);
 
                 orbit
@@ -109,7 +117,7 @@ impl DynatomicCoverBuilder
         cycles
     }
 
-    fn vertices(&self, cycles: &[Option<ShiftedCycle>]) -> Vec<ShiftedCycle>
+    fn vertices(cycles: &[Option<ShiftedCycle>]) -> Vec<ShiftedCycle>
     {
         // Vertices, labeled by abstract point
         cycles.iter().filter_map(|&v| v).collect::<Vec<_>>()
@@ -135,11 +143,11 @@ impl DynatomicCoverBuilder
                 let tag = angle0.max(angle1);
                 self.adjacency_map
                     .entry(cyc0.rep)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((cyc1, cyc0.shift, tag));
                 self.adjacency_map
                     .entry(cyc1.rep)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((cyc0, cyc1.shift, tag));
 
                 Some(EdgeRep(Edge {
@@ -236,11 +244,11 @@ impl DynatomicCoverBuilder
             nodes.push(node);
         }
 
-        return PrimitiveFace {
+        PrimitiveFace {
             label: starting_point.to_point_class(),
             vertices: nodes,
             degree: face_degree,
-        };
+        }
     }
 
     fn get_next_vertex_and_angle(
@@ -365,11 +373,11 @@ impl DynatomicCover
 
         println!(
             "\nSmallest face: {}",
-            self.face_sizes().iter().min().unwrap()
+            self.face_sizes().iter().min().unwrap_or(&usize::MAX)
         );
         println!(
             "\nLargest face: {}",
-            self.face_sizes().iter().max().unwrap()
+            self.face_sizes().iter().max().unwrap_or(&0)
         );
         println!("\nGenus is {}", self.genus());
     }

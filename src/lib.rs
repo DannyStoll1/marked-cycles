@@ -8,6 +8,7 @@ pub mod dynatomic_cover;
 pub mod global_state;
 pub mod lamination;
 pub mod marked_cycle_cover;
+pub mod tikz;
 pub mod types;
 
 const MAX_DISPLAY_ITEMS: usize = 100;
@@ -21,6 +22,7 @@ mod tests
     use crate::global_state::PERIOD;
     use crate::lamination::Lamination;
     use crate::marked_cycle_cover::MarkedCycleCover;
+    use crate::tikz::TikzRenderer;
     use crate::types::IntAngle;
 
     #[test]
@@ -135,9 +137,18 @@ mod tests
         PERIOD.set(6);
         let point = AbstractPoint::new(IntAngle(13));
         let ks = point.kneading_sequence();
-        assert_eq!(format!("{:6}", ks), "00110*");
+        assert_eq!(format!("{ks:6}"), "00110*");
 
         let (_, ks) = point.orbit_min_and_kneading_sequence();
-        assert_eq!(format!("{:6}", ks), "00110*");
+        assert_eq!(format!("{ks:6}"), "00110*");
+    }
+
+    #[test]
+    fn tikz()
+    {
+        let per1 = MarkedCycleCover::new(6, 1);
+
+        let tikz = TikzRenderer::new(per1.faces).generate();
+        println!("{tikz}");
     }
 }

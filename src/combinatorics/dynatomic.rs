@@ -57,6 +57,7 @@ impl Comb
         curve.genus()
     }
 
+    #[must_use]
     pub fn primitive_faces(&self, n: Period) -> INum
     {
         self.periodic_points(n) / (self.crit_period + 1)

@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use crate::types::{Period, RatAngle};
 use itertools::Itertools;
 
+/// Rational angle with a cached floating point value for faster comparisons in sorting
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct CachedRatAngle
 {
@@ -11,6 +12,7 @@ pub struct CachedRatAngle
 }
 impl CachedRatAngle
 {
+    #[must_use]
     pub fn new(numer: Period, denom: Period) -> Self
     {
         let angle = RatAngle::new(numer, denom);
@@ -63,7 +65,7 @@ pub struct Endpoint
 impl Endpoint
 {
     #[must_use]
-    pub fn left(angle: CachedRatAngle, other: CachedRatAngle) -> Self
+    pub const fn left(angle: CachedRatAngle, other: CachedRatAngle) -> Self
     {
         Self {
             angle,
@@ -72,7 +74,7 @@ impl Endpoint
         }
     }
     #[must_use]
-    pub fn right(angle: CachedRatAngle, other: CachedRatAngle) -> Self
+    pub const fn right(angle: CachedRatAngle, other: CachedRatAngle) -> Self
     {
         Self {
             angle,
@@ -128,14 +130,14 @@ impl Lamination
     }
 
     #[must_use]
-    pub fn with_crit_period(mut self, crit_period: Period) -> Self
+    pub const fn with_crit_period(mut self, crit_period: Period) -> Self
     {
         self.crit_period = crit_period;
         self
     }
 
     #[must_use]
-    pub fn per2(mut self) -> Self
+    pub const fn per2(mut self) -> Self
     {
         self.crit_period = 2;
         self
@@ -190,13 +192,14 @@ impl Lamination
             }
         }
 
-        new_endpoints.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+        new_endpoints
+            .sort_unstable_by(|a, b| a.partial_cmp(b).expect("NaN encountered during sort"));
 
         self.endpoints = self
             .endpoints
             .iter()
-            .cloned()
-            .merge(new_endpoints.iter().cloned())
+            .copied()
+            .merge(new_endpoints.iter().copied())
             .collect();
 
         let new_arcs = new_endpoints
@@ -239,7 +242,7 @@ impl Lamination
             return std::mem::take(&mut self.arcs[0]);
         }
 
-        return std::mem::take(&mut self.arcs[per as usize]);
+        std::mem::take(&mut self.arcs[per as usize])
     }
 
     #[must_use]

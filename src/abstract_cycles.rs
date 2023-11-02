@@ -1,7 +1,7 @@
 use crate::global_state::{MAX_ANGLE, PERIOD};
 use crate::types::{IntAngle, KneadingSequence, Period};
 
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct AbstractPoint
 {
     pub angle: IntAngle,
@@ -93,15 +93,6 @@ impl AbstractPoint
         ks
     }
 }
-
-impl PartialEq for AbstractPoint
-{
-    fn eq(&self, other: &Self) -> bool
-    {
-        self.angle == other.angle
-    }
-}
-impl Eq for AbstractPoint {}
 
 impl PartialOrd for AbstractPoint
 {
@@ -227,6 +218,7 @@ impl From<AbstractCycle> for IntAngle
     }
 }
 
+/// Represents an equivalence class of n-cycles modulo monodromy about infinity
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AbstractCycleClass
 {
@@ -244,13 +236,13 @@ impl AbstractCycleClass
     //     }
     // }
     #[must_use]
-    pub fn new(cycle: AbstractCycle) -> Self
+    pub const fn new(cycle: AbstractCycle) -> Self
     {
         Self { rep: cycle.rep }
     }
 
     #[must_use]
-    pub fn new_raw(rep: AbstractPoint) -> Self
+    pub const fn new_raw(rep: AbstractPoint) -> Self
     {
         Self { rep }
     }
