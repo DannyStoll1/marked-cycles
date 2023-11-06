@@ -5,6 +5,7 @@ use clap::Parser;
 use marked_cycles::combinatorics::{dynatomic, marked_cycle, Combinatorics};
 use marked_cycles::dynatomic_cover::DynatomicCover;
 use marked_cycles::marked_cycle_cover::MarkedCycleCover;
+use marked_cycles::tikz::TikzRenderer;
 use marked_cycles::types::Period;
 
 #[derive(Parser, Debug)]
@@ -34,6 +35,10 @@ struct Args
     /// How far to indent the cell descriptions
     #[arg(long, default_value_t = 4)]
     indent: usize,
+
+    /// Generate tikz
+    #[arg(long, default_value_t = false)]
+    tikz: bool,
 }
 
 fn print_combinatorics(args: &Args)
@@ -82,10 +87,25 @@ fn print_data_table(args: &Args)
     }
 }
 
+fn draw_largest_face(args: &Args)
+{
+    if args.tikz {
+        let tikz = if args.dynatomic {
+            let cov = DynatomicCover::new(args.marked_period, args.crit_period);
+            TikzRenderer::new(cov.primitive_faces).draw_largest_face()
+        } else {
+            let cov = MarkedCycleCover::new(args.marked_period, args.crit_period);
+            TikzRenderer::new(cov.faces).draw_largest_face()
+        };
+        println!("{tikz}");
+    }
+}
+
 fn main()
 {
     let args = Args::parse();
 
     print_combinatorics(&args);
     print_data_table(&args);
+    draw_largest_face(&args);
 }

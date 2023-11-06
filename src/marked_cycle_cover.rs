@@ -1,4 +1,5 @@
 use crate::abstract_cycles::{AbstractCycle, AbstractCycleClass, AbstractPoint};
+use crate::common::cells::{AugmentedVertex, HalfPlane, VertexData};
 use crate::common::{cells, get_orbit};
 use crate::global_state::{set_period, MAX_ANGLE, PERIOD};
 use crate::lamination::Lamination;
@@ -7,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 type Vertex = AbstractCycle;
 type Edge = cells::Edge<Vertex>;
-type Face = cells::Face<Vertex, AbstractCycleClass>;
+type Face = cells::Face<AugmentedVertex<Vertex>, AbstractCycleClass>;
 
 use self::cells::Wake;
 
@@ -16,7 +17,7 @@ pub struct MarkedCycleCoverBuilder
 {
     pub period: Period,
     pub crit_period: Period,
-    adjacency_map: HashMap<AbstractCycle, Vec<(AbstractCycle, IntAngle)>>,
+    adjacency_map: HashMap<AbstractCycle, Vec<(AbstractCycle, IntAngle, bool)>>,
 }
 
 impl MarkedCycleCoverBuilder
@@ -112,14 +113,16 @@ impl MarkedCycleCoverBuilder
                 }
 
                 let tag = angle0.max(angle1);
-                self.adjacency_map
-                    .entry(cyc0)
-                    .or_default()
-                    .push((cyc1, tag));
-                self.adjacency_map
-                    .entry(cyc1)
-                    .or_default()
-                    .push((cyc0, tag));
+                self.adjacency_map.entry(cyc0).or_default().push((
+                    cyc1,
+                    tag,
+                    angle0 + angle1 == MAX_ANGLE.get(),
+                ));
+                self.adjacency_map.entry(cyc1).or_default().push((
+                    cyc0,
+                    tag,
+                    angle0 + angle1 == MAX_ANGLE.get(),
+                ));
 
                 Some(Edge {
                     start: cyc0,
@@ -157,28 +160,61 @@ impl MarkedCycleCoverBuilder
         // angle of the current parameter
         let mut curr_angle = IntAngle(0);
 
-        let mut nodes = Vec::new();
+        let mut nodes: Vec<AugmentedVertex<Vertex>> = Vec::new();
 
         let mut face_degree = 1;
 
-        while let Some((next_node, next_angle)) = self.get_next_vertex_and_angle(node, curr_angle) {
+        let mut region_0 = HalfPlane::PosReal;
+        let mut region_1: HalfPlane;
+
+        while let Some((next_node, next_angle, neg_edge)) =
+            self.get_next_vertex_and_angle(node, curr_angle)
+        {
             // If we are crossing the real axis
-            if curr_angle >= next_angle {
+            let data = if curr_angle >= next_angle {
                 if node == starting_point {
+                    if neg_edge {
+                        nodes.get_mut(0).map(|v| v.data = VertexData::NegEdgePos);
+                    }
                     break;
                 }
                 visited.insert(node);
                 face_degree += 1;
-            }
+                region_1 = HalfPlane::from(next_angle);
+                // region_1 is guaranteed to be Lower
+                match (region_0, region_1, neg_edge) {
+                    (HalfPlane::Lower, _, true) => VertexData::NegEdgePos,
+                    (_, _, true) => VertexData::NegEdge,
+                    (HalfPlane::Lower, HalfPlane::Upper, _) => VertexData::PosReal,
+                    (HalfPlane::Lower, _, _) => VertexData::PosNeg,
+                    _ => VertexData::NegPos,
+                }
+            } else {
+                region_1 = HalfPlane::from(next_angle);
+                match (region_0, region_1, neg_edge) {
+                    (_, _, true) => VertexData::NegEdge,
+                    (HalfPlane::Upper, HalfPlane::Lower, _) => VertexData::NegReal,
+                    (HalfPlane::PosReal, HalfPlane::Upper, _) => VertexData::PosReal,
+                    (HalfPlane::PosReal, _, _) => VertexData::PosNeg,
+                    _ => VertexData::NonReal,
+                }
+            };
 
-            nodes.push(node);
+            let vertex = AugmentedVertex { vertex: node, data };
+
+            nodes.push(vertex);
             node = next_node;
 
             curr_angle = next_angle;
+            region_0 = region_1;
         }
 
         if nodes.is_empty() {
-            nodes.push(node);
+            let vertex = AugmentedVertex {
+                vertex: node,
+                data: VertexData::PosReal,
+            };
+            nodes.push(vertex);
         }
 
         let face_id = AbstractCycleClass::new(starting_point);
@@ -194,12 +230,12 @@ impl MarkedCycleCoverBuilder
         &self,
         node: AbstractCycle,
         curr_angle: IntAngle,
-    ) -> Option<(AbstractCycle, IntAngle)>
+    ) -> Option<(AbstractCycle, IntAngle, bool)>
     {
         self.adjacency_map
             .get(&node)?
             .iter()
-            .min_by_key(|(_, ang)| (ang.0 - curr_angle.0 - 1).rem_euclid(MAX_ANGLE.get().0))
+            .min_by_key(|(_, ang, _)| (ang.0 - curr_angle.0 - 1).rem_euclid(MAX_ANGLE.get().0))
             .copied()
     }
 }
@@ -256,6 +292,20 @@ impl MarkedCycleCover
         self.faces.iter().map(Face::len)
     }
 
+    pub fn face_sizes_irreflexive(&self) -> impl Iterator<Item = usize> + '_
+    {
+        self.faces.iter().filter(|f| f.degree > 1).map(Face::len)
+    }
+
+    #[must_use]
+    pub fn num_odd_faces_irreflexive(&self) -> usize
+    {
+        self.faces
+            .iter()
+            .filter(|f| f.degree > 1 && f.len() % 2 == 1)
+            .count()
+    }
+
     #[must_use]
     pub fn num_odd_faces(&self) -> usize
     {
@@ -273,7 +323,7 @@ impl MarkedCycleCover
                     println!("\n{} {}:", $count, $title);
                     for elem in $iter {
                         if binary {
-                            println!("{indent_str}{elem:b}");
+                            println!("{indent_str}{elem:b}",);
                         } else {
                             println!("{indent_str}{elem}");
                         }

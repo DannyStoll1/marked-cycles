@@ -50,11 +50,19 @@ pub mod cells
             edges
         }
 
+        #[inline]
+        pub const fn is_reflexive(&self) -> bool
+        {
+            self.degree == 1
+        }
+
+        #[inline]
         pub fn is_empty(&self) -> bool
         {
             self.vertices.is_empty()
         }
 
+        #[inline]
         pub fn len(&self) -> usize
         {
             self.vertices.len()
@@ -74,7 +82,7 @@ pub mod cells
                 f,
                 "{} = ({}); deg = {}",
                 self.label,
-                vertices_as_strings.join(", "),
+                vertices_as_strings.join(" "),
                 self.degree
             )
         }
@@ -131,7 +139,7 @@ pub mod cells
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
         {
             if let Some(width) = f.width() {
-                write!(f, "{:>width$b} <-> {:<width$b}", self.angle0, self.angle1)
+                write!(f, "{:0>width$b} <-> {:0<width$b}", self.angle0, self.angle1)
             } else {
                 write!(f, "{:b} <-> {:b}", self.angle0, self.angle1)
             }
@@ -194,12 +202,93 @@ pub mod cells
             let ks = AbstractPoint::new(self.wake.angle0).kneading_sequence();
             write!(
                 f,
-                "{:b} -- {:b}   wake = {wake:b}   KS = {ks:>period$}",
+                "{:b} -- {:b}   wake = {wake:period$b}   KS = {ks:>period$}",
                 self.start,
                 self.end,
                 wake = self.wake,
                 period = PERIOD.get() as usize
             )
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum HalfPlane
+    {
+        Upper,
+        Lower,
+        #[default]
+        PosReal,
+        NegReal,
+    }
+
+    impl From<IntAngle> for HalfPlane
+    {
+        fn from(angle: IntAngle) -> Self
+        {
+            use std::cmp::Ordering::*;
+            match (angle * 2).cmp(&MAX_ANGLE.get()) {
+                Less => Self::Upper,
+                Equal => Self::NegReal,
+                Greater => Self::Lower,
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum VertexData
+    {
+        PosReal,
+        NegReal,
+        PosNeg,
+        NegPos,
+        NegEdge,
+        NegEdgePos,
+        #[default]
+        NonReal,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct AugmentedVertex<V>
+    {
+        pub vertex: V,
+        pub data: VertexData,
+    }
+
+    impl<V> std::fmt::Display for AugmentedVertex<V>
+    where
+        V: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+        {
+            use VertexData::*;
+            match self.data {
+                NonReal => self.vertex.fmt(f),
+                PosReal => write!(f, "+{}", self.vertex),
+                NegReal => write!(f, "-{}", self.vertex),
+                PosNeg => write!(f, "+-{}", self.vertex),
+                NegPos => write!(f, "-+{}", self.vertex),
+                NegEdge => write!(f, "{} ===", self.vertex),
+                NegEdgePos => write!(f, "+{} ===", self.vertex),
+            }
+        }
+    }
+
+    impl<V> std::fmt::Binary for AugmentedVertex<V>
+    where
+        V: std::fmt::Binary,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+        {
+            use VertexData::*;
+            match self.data {
+                NonReal => self.vertex.fmt(f),
+                PosReal => write!(f, "+{:b}", self.vertex),
+                NegReal => write!(f, "-{:b}", self.vertex),
+                PosNeg => write!(f, "+-{:b}", self.vertex),
+                NegPos => write!(f, "-+{:b}", self.vertex),
+                NegEdge => write!(f, "={:b}", self.vertex),
+                NegEdgePos => write!(f, "=+{:b}", self.vertex),
+            }
         }
     }
 }

@@ -8,6 +8,7 @@ pub mod dynatomic_cover;
 pub mod global_state;
 pub mod lamination;
 pub mod marked_cycle_cover;
+pub mod prelude;
 pub mod tikz;
 pub mod types;
 

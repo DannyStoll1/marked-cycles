@@ -88,6 +88,21 @@ where
     }
 
     #[must_use]
+    pub fn draw_largest_face(mut self) -> String
+    {
+        let max_size = self.faces.iter().map(Face::len).max().unwrap_or_default();
+        let faces = std::mem::take(&mut self.faces);
+        for f in &faces {
+            if f.len() == max_size {
+                self.draw_face(f);
+                break
+            }
+        }
+        self.commands.push(r"\end{tikzpicture}".to_owned());
+        self.commands.join("\n")
+    }
+
+    #[must_use]
     pub fn generate(mut self) -> String
     {
         let faces = std::mem::take(&mut self.faces);
