@@ -100,7 +100,7 @@ pub mod cells
                 f,
                 "{:b} = ({}); deg = {}",
                 self.label,
-                vertices_as_strings.join(", "),
+                vertices_as_strings.join(" "),
                 self.degree
             )
         }
@@ -139,14 +139,14 @@ pub mod cells
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
         {
             if let Some(width) = f.width() {
-                write!(f, "{:0>width$b} <-> {:0<width$b}", self.angle0, self.angle1)
+                write!(f, "{:0>width$b} <-> {:0>width$b}", self.angle0, self.angle1)
             } else {
                 write!(f, "{:b} <-> {:b}", self.angle0, self.angle1)
             }
         }
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, PartialEq, Eq, Clone)]
     pub struct Edge<V>
     {
         pub start: V,
@@ -247,6 +247,25 @@ pub mod cells
         NonReal,
     }
 
+    impl VertexData
+    {
+        pub const fn neg_edge(&self) -> bool
+        {
+            matches!(self, Self::NegEdge | Self::NegEdgePos)
+        }
+        pub const fn pos_vertex(&self) -> bool
+        {
+            matches!(
+                self,
+                Self::PosReal | Self::PosNeg | Self::NegPos | Self::NegEdgePos
+            )
+        }
+        pub const fn neg_vertex(&self) -> bool
+        {
+            matches!(self, Self::NegReal | Self::PosNeg | Self::NegPos)
+        }
+    }
+
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct AugmentedVertex<V>
     {
@@ -286,8 +305,8 @@ pub mod cells
                 NegReal => write!(f, "-{:b}", self.vertex),
                 PosNeg => write!(f, "+-{:b}", self.vertex),
                 NegPos => write!(f, "-+{:b}", self.vertex),
-                NegEdge => write!(f, "={:b}", self.vertex),
-                NegEdgePos => write!(f, "=+{:b}", self.vertex),
+                NegEdge => write!(f, "{:b} ===", self.vertex),
+                NegEdgePos => write!(f, "+{:b} ===", self.vertex),
             }
         }
     }

@@ -90,13 +90,9 @@ fn print_data_table(args: &Args)
 fn draw_largest_face(args: &Args)
 {
     if args.tikz {
-        let tikz = if args.dynatomic {
-            let cov = DynatomicCover::new(args.marked_period, args.crit_period);
-            TikzRenderer::new(cov.primitive_faces).draw_largest_face()
-        } else {
-            let cov = MarkedCycleCover::new(args.marked_period, args.crit_period);
-            TikzRenderer::new(cov.faces).draw_largest_face()
-        };
+        let cov = MarkedCycleCover::new(args.marked_period, args.crit_period);
+        let tikz = TikzRenderer::new(cov.faces).draw_smallest_face();
+        // let tikz = TikzRenderer::new(cov.faces).draw_largest_face();
         println!("{tikz}");
     }
 }
@@ -105,7 +101,10 @@ fn main()
 {
     let args = Args::parse();
 
+    if args.tikz {
+        draw_largest_face(&args);
+        return;
+    }
     print_combinatorics(&args);
     print_data_table(&args);
-    draw_largest_face(&args);
 }

@@ -6,9 +6,9 @@ use crate::lamination::Lamination;
 use crate::types::{IntAngle, Period};
 use std::collections::{HashMap, HashSet};
 
-type Vertex = AbstractCycle;
-type Edge = cells::Edge<Vertex>;
-type Face = cells::Face<AugmentedVertex<Vertex>, AbstractCycleClass>;
+pub type MCVertex = AbstractCycle;
+pub type MCEdge = cells::Edge<MCVertex>;
+pub type MCFace = cells::Face<AugmentedVertex<MCVertex>, AbstractCycleClass>;
 
 use self::cells::Wake;
 
@@ -92,7 +92,7 @@ impl MarkedCycleCoverBuilder
         vertices
     }
 
-    fn edges(&mut self, cycles: &[Option<AbstractCycle>]) -> Vec<Edge>
+    fn edges(&mut self, cycles: &[Option<AbstractCycle>]) -> Vec<MCEdge>
     {
         Lamination::new()
             .with_crit_period(self.crit_period)
@@ -124,7 +124,7 @@ impl MarkedCycleCoverBuilder
                     angle0 + angle1 == MAX_ANGLE.get(),
                 ));
 
-                Some(Edge {
+                Some(MCEdge {
                     start: cyc0,
                     end: cyc1,
                     wake: Wake { angle0, angle1 },
@@ -133,7 +133,7 @@ impl MarkedCycleCoverBuilder
             .collect()
     }
 
-    fn faces(&self, vertices: &[AbstractCycle]) -> Vec<Face>
+    fn faces(&self, vertices: &[AbstractCycle]) -> Vec<MCFace>
     {
         let mut visited = HashSet::new();
         vertices
@@ -152,7 +152,7 @@ impl MarkedCycleCoverBuilder
         &self,
         starting_point: AbstractCycle,
         visited: &mut HashSet<AbstractCycle>,
-    ) -> Face
+    ) -> MCFace
     {
         // cycle that is currently marked
         let mut node: AbstractCycle = starting_point;
@@ -160,7 +160,7 @@ impl MarkedCycleCoverBuilder
         // angle of the current parameter
         let mut curr_angle = IntAngle(0);
 
-        let mut nodes: Vec<AugmentedVertex<Vertex>> = Vec::new();
+        let mut vertices: Vec<AugmentedVertex<MCVertex>> = Vec::new();
 
         let mut face_degree = 1;
 
@@ -174,7 +174,7 @@ impl MarkedCycleCoverBuilder
             let data = if curr_angle >= next_angle {
                 if node == starting_point {
                     if neg_edge {
-                        nodes.get_mut(0).map(|v| v.data = VertexData::NegEdgePos);
+                        vertices.get_mut(0).map(|v| v.data = VertexData::NegEdgePos);
                     }
                     break;
                 }
@@ -202,26 +202,26 @@ impl MarkedCycleCoverBuilder
 
             let vertex = AugmentedVertex { vertex: node, data };
 
-            nodes.push(vertex);
+            vertices.push(vertex);
             node = next_node;
 
             curr_angle = next_angle;
             region_0 = region_1;
         }
 
-        if nodes.is_empty() {
+        if vertices.is_empty() {
             let vertex = AugmentedVertex {
                 vertex: node,
                 data: VertexData::PosReal,
             };
-            nodes.push(vertex);
+            vertices.push(vertex);
         }
 
         let face_id = AbstractCycleClass::new(starting_point);
 
-        Face {
+        MCFace {
             label: face_id,
-            vertices: nodes,
+            vertices,
             degree: face_degree,
         }
     }
@@ -245,8 +245,8 @@ pub struct MarkedCycleCover
 {
     pub crit_period: Period,
     pub vertices: Vec<AbstractCycle>,
-    pub edges: Vec<Edge>,
-    pub faces: Vec<Face>,
+    pub edges: Vec<MCEdge>,
+    pub faces: Vec<MCFace>,
 }
 
 impl MarkedCycleCover
@@ -289,12 +289,12 @@ impl MarkedCycleCover
 
     pub fn face_sizes(&self) -> impl Iterator<Item = usize> + '_
     {
-        self.faces.iter().map(Face::len)
+        self.faces.iter().map(MCFace::len)
     }
 
     pub fn face_sizes_irreflexive(&self) -> impl Iterator<Item = usize> + '_
     {
-        self.faces.iter().filter(|f| f.degree > 1).map(Face::len)
+        self.faces.iter().filter(|f| f.degree > 1).map(MCFace::len)
     }
 
     #[must_use]

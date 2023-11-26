@@ -86,19 +86,15 @@ impl DynatomicCoverBuilder
 
             let orbit = get_orbit(theta.into());
             if orbit.len() == self.period as usize {
-                let (rep_idx, cycle_rep) = orbit
-                    .iter()
-                    .enumerate()
-                    .min_by_key(|x| x.1)
-                    .expect("Orbit is empty!");
-                let cycle_rep = AbstractPoint::new(*cycle_rep);
+                let cycle_rep = orbit[0]; // Always the minimum in the orbit
+                let cycle_rep = AbstractPoint::new(cycle_rep);
 
                 orbit
                     .iter()
                     .map(|x| usize::try_from(*x).unwrap_or_default())
                     .enumerate()
                     .for_each(|(i, x)| {
-                        let shift = ((i as i64) - (rep_idx as i64)).rem_euclid(PERIOD.get());
+                        let shift = i as i64;
                         let shifted_cycle = ShiftedCycle {
                             rep: cycle_rep,
                             shift,
@@ -159,9 +155,9 @@ impl DynatomicCoverBuilder
             .collect()
     }
 
-    fn edges(&mut self, wakes: &[EdgeRep]) -> Vec<Edge>
+    fn edges(&mut self, edge_reps: &[EdgeRep]) -> Vec<Edge>
     {
-        wakes
+        edge_reps
             .iter()
             .flat_map(|EdgeRep(e)| {
                 (0..self.period).map(|i| Edge {
@@ -187,7 +183,7 @@ impl DynatomicCoverBuilder
                     SatelliteFace {
                         label: base_point,
                         vertices: (0..face_period)
-                            .map(|j| base_point.rotate(j * num_faces))
+                            .map(|j| base_point.rotate(j * shift))
                             .collect(),
                         degree: 1,
                     }

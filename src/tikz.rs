@@ -1,4 +1,4 @@
-use crate::common::cells::{Edge, Face};
+use crate::common::cells::{AugmentedVertex as Aug, Edge, Face};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{f32::consts::PI, fmt::Display};
@@ -12,7 +12,7 @@ pub struct TikzRenderer<V, F>
 {
     commands: Vec<String>,
     edges: Vec<Edge<V>>,
-    faces: Vec<Face<V, F>>,
+    faces: Vec<Face<Aug<V>, F>>,
 }
 impl<V, F> TikzRenderer<V, F>
 where
@@ -23,7 +23,7 @@ where
 
     // pub fn new(edges: Vec<Edge<V>>, faces: Vec<Face<V, F>>) -> Self
     #[must_use]
-    pub fn new(faces: Vec<Face<V, F>>) -> Self
+    pub fn new(faces: Vec<Face<Aug<V>, F>>) -> Self
     {
         let commands = vec![
             r"\begin{tikzpicture}".to_owned(),
@@ -36,7 +36,7 @@ where
         }
     }
 
-    fn draw_face(&mut self, face: &Face<V, F>)
+    fn draw_face(&mut self, face: &Face<Aug<V>, F>)
     {
         let n = face.len();
 
@@ -60,14 +60,14 @@ where
             r"    \node {face_id} at (\anchorx, 0) {{{face_label}}};"
         ));
 
-        let label = format!("{}", face.vertices[0]);
+        let label = format!("{}", face.vertices[0].vertex);
         let label = RE_DEL.replace_all(&label, r"$\del{$1}$").to_string();
         self.commands.push(format!(
             r"    \node (node-{face_idx}-0) at (${face_id}+(\baseangle:{radius})$) {{{label}}};",
         ));
 
-        for (i, vertex) in face.vertices.iter().enumerate().skip(1) {
-            let label = vertex.to_string();
+        for (i, node) in face.vertices.iter().enumerate().skip(1) {
+            let label = node.vertex.to_string();
             let label = RE_DEL.replace_all(&label, r"$\del{$1}$").to_string();
             self.commands.push(format!(
                 // r"    \node (node-{face_idx}-{i}) at ($(node-{face_idx}-{prev})+({{\baseangle - 90 - {i}*\anglestep}}:)$) {{{label}}};",
@@ -81,9 +81,30 @@ where
         // draw the edges between the nodes
         for i in 0..n {
             let next = (i + 1) % n;
-            self.commands.push(format!(
-                r"    \draw (node-{face_idx}-{i}) -- (node-{face_idx}-{next});"
-            ));
+
+            let data = face.vertices[i].data;
+
+            if data.neg_edge() {
+                self.commands.push(format!(
+                    r"    \draw[double,double distance=2pt] (node-{face_idx}-{i}) -- (node-{face_idx}-{next});"
+                ));
+            } else {
+                self.commands.push(format!(
+                    r"    \draw (node-{face_idx}-{i}) -- (node-{face_idx}-{next});"
+                ));
+            }
+
+            if data.pos_vertex() {
+                self.commands.push(format!(
+                    r"    \draw[dashed] (node-{face_idx}-{i}) -- {face_id};"
+                ));
+            }
+
+            if data.neg_vertex() {
+                self.commands.push(format!(
+                    r"    \draw[dotted] (node-{face_idx}-{i}) -- {face_id};"
+                ));
+            }
         }
     }
 
@@ -95,7 +116,22 @@ where
         for f in &faces {
             if f.len() == max_size {
                 self.draw_face(f);
-                break
+                break;
+            }
+        }
+        self.commands.push(r"\end{tikzpicture}".to_owned());
+        self.commands.join("\n")
+    }
+
+    #[must_use]
+    pub fn draw_smallest_face(mut self) -> String
+    {
+        let min_size = self.faces.iter().map(Face::len).min().unwrap_or_default();
+        let faces = std::mem::take(&mut self.faces);
+        for f in &faces {
+            if f.len() == min_size {
+                self.draw_face(f);
+                break;
             }
         }
         self.commands.push(r"\end{tikzpicture}".to_owned());
